@@ -1,0 +1,251 @@
+import { BenchmarkData, BenchmarkComparison, BenchmarkPercentiles } from './types';
+import Papa from 'papaparse';
+
+// Cache for benchmark data
+let benchmarkCache: BenchmarkData[] | null = null;
+
+// Flag to determine whether to use Domo API or CSV fallback
+const USE_DOMO_API = process.env.NEXT_PUBLIC_USE_DOMO_API === 'true';
+
+/**
+ * Load benchmark data from Domo API
+ */
+async function loadFromDomoAPI(): Promise<BenchmarkData[]> {
+  try {
+    const response = await fetch('/api/benchmark');
+    const result = await response.json();
+
+    if (!result.success) {
+      console.error('Domo API error:', result.error);
+      throw new Error(result.error);
+    }
+
+    // Transform Domo data to BenchmarkData format
+    // Domo returns data with column names: Type, BMAssets, BMAvgBalance, RetirementFee25th, etc.
+    return result.data.map((row: any) => ({
+      clientID: row.ClientID || '',
+      salesforceAccountID: row.SalesforceAccountID || '',
+      d365AccountID: row.D365AccountID || '',
+      reportID: row.ReportID || '',
+      creationDate: row.CreationDate || '',
+      clientName: row.ClientName || '',
+      sic: row.SIC || '',
+      benchmarkSource: row.BenchmarkSource || '',
+      type: row.Type || '',
+      bmAssets: row.BMAssets || '',
+      bmAvgBalance: row.BMAvgBalance || 'All',
+      retirementFee25th: parseFloat(row.RetirementFee25th || 0),
+      retirementFee50th: parseFloat(row.RetirementFee50th || 0),
+      retirementFee75th: parseFloat(row.RetirementFee75th || 0),
+      assets: parseFloat(row.Assets || 0),
+      avgBalance: parseFloat(row.AvgBalance || 0),
+      recordKeeperFeePrcnt: parseFloat(row.RecordKeeperFeePrcnt || 0),
+      advisorFeePrcnt: parseFloat(row.AdvisorFeePrcnt || 0),
+      investmentManagerFeePrcnt: parseFloat(row.InvestmentManagerFeePrcnt || 0),
+      tpaFeePrcnt: parseFloat(row.TPAFeePrcnt || 0),
+      totalPlanFeePrcnt: parseFloat(row.TotalPlanFeePrcnt || 0),
+      recordKeeperFeeDollars: parseFloat(row.RecordKeeperFeeDollars || 0),
+      advisorFeeDollars: parseFloat(row.AdvisorFeeDollars || 0),
+      investmentManagerFeeDollars: parseFloat(row.InvestmentManagerFeeDollars || 0),
+      tpaFeeDollars: parseFloat(row.TPAFeeDollars || 0),
+      totalPlanFeeDollars: parseFloat(row.TotalPlanFeeDollars || 0),
+    }));
+  } catch (error) {
+    console.error('Error loading from Domo API:', error);
+    throw error;
+  }
+}
+
+/**
+ * Load benchmark data from CSV file (fallback)
+ */
+async function loadFromCSV(): Promise<BenchmarkData[]> {
+  try {
+    const response = await fetch('/RetirementFeeDataset (1).csv');
+    const csvText = await response.text();
+
+    const result = Papa.parse<any>(csvText, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (header) => {
+        // Convert CSV headers to camelCase
+        return header
+          .replace(/^\uFEFF/, '') // Remove BOM
+          .replace(/([A-Z])/g, (match, p1, offset) =>
+            offset === 0 ? p1.toLowerCase() : p1
+          );
+      },
+      transform: (value) => {
+        // Clean up values
+        if (value === '' || value === 'null') return null;
+        // Try to parse as number
+        const num = parseFloat(value);
+        return isNaN(num) ? value : num;
+      }
+    });
+
+    return result.data as BenchmarkData[];
+  } catch (error) {
+    console.error('Error loading from CSV:', error);
+    throw error;
+  }
+}
+
+/**
+ * Load benchmark data from configured source (Domo API or CSV)
+ */
+export async function loadBenchmarkData(): Promise<BenchmarkData[]> {
+  if (benchmarkCache) {
+    return benchmarkCache;
+  }
+
+  try {
+    if (USE_DOMO_API) {
+      console.log('Loading benchmark data from Domo API...');
+      benchmarkCache = await loadFromDomoAPI();
+    } else {
+      console.log('Loading benchmark data from CSV file...');
+      benchmarkCache = await loadFromCSV();
+    }
+
+    return benchmarkCache;
+  } catch (error) {
+    console.error('Error loading benchmark data:', error);
+
+    // If Domo API fails, try CSV as fallback
+    if (USE_DOMO_API) {
+      console.log('Falling back to CSV...');
+      try {
+        benchmarkCache = await loadFromCSV();
+        return benchmarkCache;
+      } catch (csvError) {
+        console.error('CSV fallback also failed:', csvError);
+      }
+    }
+
+    return [];
+  }
+}
+
+/**
+ * Find benchmark percentiles for a specific fee type and AUM bucket
+ * If no match found for specified avgBalanceBucket, calculates weighted average across all balance buckets
+ * IMPORTANT: Only queries rows where Benchmark Source = "FDI 2024" (most recent data)
+ */
+export function findBenchmarkPercentiles(
+  benchmarkData: BenchmarkData[],
+  feeType: string,
+  aumBucket: string,
+  avgBalanceBucket: string = 'All'
+): BenchmarkPercentiles | null {
+  // First try exact match with FDI 2024 data only
+  const match = benchmarkData.find(
+    (row) =>
+      row.benchmarkSource === 'FDI 2024' &&
+      row.type === feeType &&
+      row.bmAssets === aumBucket &&
+      row.bmAvgBalance === avgBalanceBucket
+  );
+
+  if (match) {
+    return {
+      p25: match.retirementFee25th || 0,
+      p50: match.retirementFee50th || 0,
+      p75: match.retirementFee75th || 0,
+    };
+  }
+
+  // If no exact match and looking for 'All', try to find records with specific balance buckets
+  // and use the middle bucket (50-75k) as a reasonable default
+  if (avgBalanceBucket === 'All') {
+    const allMatches = benchmarkData.filter(
+      (row) =>
+        row.benchmarkSource === 'FDI 2024' &&
+        row.type === feeType &&
+        row.bmAssets === aumBucket
+    );
+
+    if (allMatches.length > 0) {
+      // Try to find a middle-range balance bucket or just use the first one
+      const middleMatch = allMatches.find(r => r.bmAvgBalance === '$50-75k') || allMatches[0];
+      return {
+        p25: middleMatch.retirementFee25th || 0,
+        p50: middleMatch.retirementFee50th || 0,
+        p75: middleMatch.retirementFee75th || 0,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get all benchmark comparisons for the plan
+ * Different fee types have different query requirements:
+ * - Advisor & Investment Manager: Query by AUM only (balance always "All")
+ * - Record Keeper: Query by AUM + Balance (unbundled only)
+ * - TPA: Query by AUM + Balance
+ * - Total Plan Fee: Query by AUM + Balance, using bundled/unbundled based on feeType
+ */
+export async function getBenchmarkComparison(
+  aumBucket: string,
+  avgBalanceBucket: string = 'All',
+  feeType: 'bundled' | 'unbundled' = 'unbundled'
+): Promise<BenchmarkComparison> {
+  const benchmarkData = await loadBenchmarkData();
+
+  console.log(`[getBenchmarkComparison] Querying for AUM: ${aumBucket}, Avg Balance: ${avgBalanceBucket}`);
+  console.log(`[getBenchmarkComparison] Total rows in dataset: ${benchmarkData.length}`);
+
+  // Advisor Fee: Query by AUM only (balance is always "All")
+  const advisor = findBenchmarkPercentiles(benchmarkData, 'Advisor Fee', aumBucket, 'All');
+
+  // Investment Manager Fee: Query by AUM only (balance is always "All")
+  const investmentMenu = findBenchmarkPercentiles(benchmarkData, 'Investment Manager fee', aumBucket, 'All');
+
+  // Record Keeper Fee: Query by AUM + Balance (unbundled only)
+  const recordKeeper = findBenchmarkPercentiles(benchmarkData, 'Record Keeper Fee - Unbundled', aumBucket, avgBalanceBucket);
+
+  // TPA Fee: Query by AUM + Balance
+  const tpa = findBenchmarkPercentiles(benchmarkData, 'TPA Fee', aumBucket, avgBalanceBucket);
+
+  // Total Plan Fee: Query by AUM + Balance (use bundled or unbundled based on feeType)
+  const totalFeeType = feeType === 'bundled' ? 'Total Plan Fee - Bundled' : 'Total Plan Fee - Unbundled';
+  const total = findBenchmarkPercentiles(benchmarkData, totalFeeType, aumBucket, avgBalanceBucket);
+
+  console.log(`[getBenchmarkComparison] Using Total Plan Fee type: ${totalFeeType}`);
+
+  console.log(`[getBenchmarkComparison] Results:`, {
+    advisor: advisor ? 'found' : 'NOT FOUND',
+    recordKeeper: recordKeeper ? 'found' : 'NOT FOUND',
+    tpa: tpa ? 'found' : 'NOT FOUND',
+    investmentMenu: investmentMenu ? 'found' : 'NOT FOUND',
+    total: total ? 'found' : 'NOT FOUND',
+  });
+
+  return {
+    advisor: advisor || { p25: 0, p50: 0, p75: 0 },
+    recordKeeper: recordKeeper || { p25: 0, p50: 0, p75: 0 },
+    tpa: tpa || { p25: 0, p50: 0, p75: 0 },
+    investmentMenu: investmentMenu || { p25: 0, p50: 0, p75: 0 },
+    total: total || { p25: 0, p50: 0, p75: 0 },
+  };
+}
+
+/**
+ * Get available AUM buckets from the dataset
+ */
+export async function getAvailableAUMBuckets(): Promise<string[]> {
+  const benchmarkData = await loadBenchmarkData();
+  const buckets = new Set(benchmarkData.map(row => row.bmAssets));
+  return Array.from(buckets).filter(bucket => bucket && bucket !== 'All').sort();
+}
+
+/**
+ * Get available average balance buckets from the dataset
+ */
+export async function getAvailableAvgBalanceBuckets(): Promise<string[]> {
+  const benchmarkData = await loadBenchmarkData();
+  const buckets = new Set(benchmarkData.map(row => row.bmAvgBalance));
+  return Array.from(buckets).filter(bucket => bucket).sort();
+}

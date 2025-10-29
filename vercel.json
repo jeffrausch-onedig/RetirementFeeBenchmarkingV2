@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build",
+  "framework": "nextjs",
+  "env": {
+    "DOMO_CLIENT_ID": "@domo_client_id",
+    "DOMO_CLIENT_SECRET": "@domo_client_secret",
+    "DOMO_DATASET_ID": "@domo_dataset_id",
+    "NEXT_PUBLIC_USE_DOMO_API": "@next_public_use_domo_api"
+  }
+}
