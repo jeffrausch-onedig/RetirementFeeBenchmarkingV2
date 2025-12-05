@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchBenchmarkData } from '@/lib/domoApi';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs'; // Force Node.js runtime for Buffer support
 
 /**
  * Test endpoint to verify Domo API connection

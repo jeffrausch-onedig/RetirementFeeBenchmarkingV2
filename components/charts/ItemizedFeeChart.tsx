@@ -11,13 +11,13 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { CalculatedFee, BenchmarkStats } from "@/lib/types";
+import { CalculatedFee, BenchmarkPercentiles } from "@/lib/types";
 
 export type FeeViewMode = "percentage" | "dollars" | "basisPoints";
 
 interface ItemizedFeeChartProps {
   title: string;
-  benchmarks: BenchmarkStats;
+  benchmarks: BenchmarkPercentiles;
   existingFee: CalculatedFee;
   proposedFee?: CalculatedFee;
   color: string;

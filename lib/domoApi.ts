@@ -32,18 +32,18 @@ async function getAccessToken(): Promise<string> {
   }
 
   try {
+    // Encode credentials as Base64 for Basic Auth
+    // Use btoa for browser/edge compatibility, Buffer for Node
+    const credentials = typeof Buffer !== 'undefined'
+      ? Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+      : btoa(`${clientId}:${clientSecret}`);
+
     const response = await axios.post<DomoAuthResponse>(
       'https://api.domo.com/oauth/token',
-      new URLSearchParams({
-        grant_type: 'client_credentials',
-        scope: 'data',
-      }),
+      'grant_type=client_credentials&scope=data',
       {
-        auth: {
-          username: clientId,
-          password: clientSecret,
-        },
         headers: {
+          'Authorization': `Basic ${credentials}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
       }
@@ -56,7 +56,14 @@ async function getAccessToken(): Promise<string> {
     return cachedToken;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      throw new Error(`Domo authentication failed: ${error.response?.data?.message || error.message}`);
+      const errorDetails = {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+      };
+      console.error('Domo auth error details:', JSON.stringify(errorDetails, null, 2));
+      throw new Error(`Domo authentication failed (${error.response?.status}): ${error.response?.data?.error || error.response?.data?.message || error.message}`);
     }
     throw error;
   }

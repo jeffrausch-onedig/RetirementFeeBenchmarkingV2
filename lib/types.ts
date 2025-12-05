@@ -116,3 +116,18 @@ export interface BenchmarkComparison {
   investmentMenu: BenchmarkPercentiles;
   total: BenchmarkPercentiles;
 }
+
+// AI Summary types
+export interface AISummaryRequest {
+  planData: PlanData;
+  calculatedFees: CalculatedFees;
+  benchmarks: BenchmarkComparison;
+  proposedPlanData?: PlanData;
+  proposedCalculatedFees?: CalculatedFees;
+  aumBucket: string;
+}
+
+export interface AISummaryResponse {
+  summary: string;
+  error?: string;
+}

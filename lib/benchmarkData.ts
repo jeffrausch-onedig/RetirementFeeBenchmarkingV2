@@ -1,11 +1,7 @@
 import { BenchmarkData, BenchmarkComparison, BenchmarkPercentiles } from './types';
-import Papa from 'papaparse';
 
 // Cache for benchmark data
 let benchmarkCache: BenchmarkData[] | null = null;
-
-// Flag to determine whether to use Domo API or CSV fallback
-const USE_DOMO_API = process.env.NEXT_PUBLIC_USE_DOMO_API === 'true';
 
 /**
  * Load benchmark data from Domo API
@@ -56,43 +52,9 @@ async function loadFromDomoAPI(): Promise<BenchmarkData[]> {
   }
 }
 
-/**
- * Load benchmark data from CSV file (fallback)
- */
-async function loadFromCSV(): Promise<BenchmarkData[]> {
-  try {
-    const response = await fetch('/RetirementFeeDataset (1).csv');
-    const csvText = await response.text();
-
-    const result = Papa.parse<any>(csvText, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header) => {
-        // Convert CSV headers to camelCase
-        return header
-          .replace(/^\uFEFF/, '') // Remove BOM
-          .replace(/([A-Z])/g, (match, p1, offset) =>
-            offset === 0 ? p1.toLowerCase() : p1
-          );
-      },
-      transform: (value) => {
-        // Clean up values
-        if (value === '' || value === 'null') return null;
-        // Try to parse as number
-        const num = parseFloat(value);
-        return isNaN(num) ? value : num;
-      }
-    });
-
-    return result.data as BenchmarkData[];
-  } catch (error) {
-    console.error('Error loading from CSV:', error);
-    throw error;
-  }
-}
 
 /**
- * Load benchmark data from configured source (Domo API or CSV)
+ * Load benchmark data from Domo API
  */
 export async function loadBenchmarkData(): Promise<BenchmarkData[]> {
   if (benchmarkCache) {
@@ -100,30 +62,12 @@ export async function loadBenchmarkData(): Promise<BenchmarkData[]> {
   }
 
   try {
-    if (USE_DOMO_API) {
-      console.log('Loading benchmark data from Domo API...');
-      benchmarkCache = await loadFromDomoAPI();
-    } else {
-      console.log('Loading benchmark data from CSV file...');
-      benchmarkCache = await loadFromCSV();
-    }
-
+    console.log('Loading benchmark data from Domo API...');
+    benchmarkCache = await loadFromDomoAPI();
     return benchmarkCache;
   } catch (error) {
-    console.error('Error loading benchmark data:', error);
-
-    // If Domo API fails, try CSV as fallback
-    if (USE_DOMO_API) {
-      console.log('Falling back to CSV...');
-      try {
-        benchmarkCache = await loadFromCSV();
-        return benchmarkCache;
-      } catch (csvError) {
-        console.error('CSV fallback also failed:', csvError);
-      }
-    }
-
-    return [];
+    console.error('Error loading benchmark data from Domo API:', error);
+    throw error; // Don't return empty array, let the error propagate
   }
 }
 

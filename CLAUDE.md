@@ -78,6 +78,14 @@ All types are defined in `lib/types.ts`. Key interfaces:
 - `FeeSummaryTable`: Tabular comparison with difference calculations
 - `PercentileBarChart`: Individual fee type comparison to benchmarks
 
+**AI Executive Summary** (`ExecutiveSummary.tsx`):
+- Generates natural language analysis of fee benchmarking results
+- Combines structured fee data with contextual prompts
+- Calls Azure OpenAI API via `/api/ai-summary` endpoint
+- Provides insights valuable to both advisors and clients
+- Handles loading and error states gracefully
+- Integrates with PowerPoint export (summary becomes first slide when generated)
+
 All charts use Recharts with custom theming via CSS variables defined in `globals.css`.
 
 ## Extending the Application
@@ -111,6 +119,56 @@ Currently uses static CSV data. To connect to Domo API:
 5. Update `loadBenchmarkData()` in `lib/benchmarkData.ts` to fetch from `/api/benchmark`
 
 The Domo dataset must match the `BenchmarkData` interface schema. See DOMO_SETUP.md for complete integration guide.
+
+## Azure OpenAI Integration
+
+The AI Executive Summary feature uses Azure OpenAI to generate natural language insights from benchmarking data.
+
+### Configuration
+
+Add to `.env.local`:
+```
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+AZURE_OPENAI_API_KEY=your-api-key
+AZURE_OPENAI_DEPLOYMENT=your-deployment-name
+AZURE_OPENAI_API_VERSION=2024-02-15-preview
+```
+
+### Implementation Architecture
+
+1. **Prompt Engineering** (`lib/aiSummary.ts`):
+   - `buildSummaryPrompt()`: Constructs structured prompt combining:
+     - Plan metadata (AUM, participants, AUM bucket)
+     - Calculated fee breakdowns (dollar amounts and percentages)
+     - Benchmark comparisons (percentile positioning)
+     - Context for advisor vs. client perspectives
+   - Designed for consistent, professional output suitable for client reports
+
+2. **API Route** (`app/api/ai-summary/route.ts`):
+   - Server-side Azure OpenAI API calls
+   - Supports streaming responses for better UX
+   - Handles authentication via environment variables
+   - Error handling with fallback messages
+
+3. **Component** (`ExecutiveSummary.tsx`):
+   - Displays AI-generated summary in results section
+   - Shows loading state during generation
+   - Handles errors gracefully
+   - Markdown rendering for formatted output
+
+### Prompt Design
+
+The prompt follows this structure:
+- **Role**: Expert retirement plan consultant
+- **Task**: Analyze fee benchmarking results
+- **Context**: Structured data including all fee types, benchmarks, and comparisons
+- **Output**: Professional executive summary highlighting:
+  - Overall fee positioning vs. market
+  - Specific areas of strength or concern
+  - Quantified savings opportunities (if proposed plan exists)
+  - Actionable recommendations
+
+The prompt is designed to produce stable, consistent output that avoids hallucination by grounding all statements in the provided structured data.
 
 ## Important Implementation Details
 

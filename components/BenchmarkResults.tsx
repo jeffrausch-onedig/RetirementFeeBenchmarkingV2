@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FeeBenchmarkChart } from "./charts/FeeBenchmarkChart";
 import { ItemizedFeeChart, FeeViewMode } from "./charts/ItemizedFeeChart";
 import { Button } from "@/components/ui/button";
+import { ExecutiveSummary } from "./ExecutiveSummary";
+import type { AISummaryRequest } from "@/lib/types";
 
 interface BenchmarkResultsProps {
   data: ComparisonData;
@@ -21,6 +23,8 @@ export function BenchmarkResults({ data }: BenchmarkResultsProps) {
   const [proposedFees, setProposedFees] = useState<CalculatedFees | null>(null);
   const [loading, setLoading] = useState(true);
   const [feeViewMode, setFeeViewMode] = useState<FeeViewMode>("basisPoints");
+  const [aiSummary, setAiSummary] = useState<string | undefined>(undefined);
+  const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -73,12 +77,29 @@ export function BenchmarkResults({ data }: BenchmarkResultsProps) {
   }
 
   const aum = data.existing?.assetsUnderManagement || 0;
+  const aumBucket = data.existing?.benchmarkCategory || getAUMBucket(aum);
 
   // Generate disclaimer text
   const disclaimerText = getDisclaimerText(
     data.existing?.benchmarkCategory,
     data.existing?.balanceBenchmarkCategory
   );
+
+  // Prepare AI summary request
+  const aiSummaryRequest: AISummaryRequest = {
+    planData: data.existing!,
+    calculatedFees: existingFees,
+    benchmarks,
+    proposedPlanData: data.proposed,
+    proposedCalculatedFees: proposedFees || undefined,
+    aumBucket,
+  };
+
+  // Handle AI summary generation
+  const handleSummaryGenerated = (summary: string) => {
+    setAiSummary(summary);
+    setShowSummary(true);
+  };
 
   // Handle PowerPoint export
   const handleExport = async () => {
@@ -92,6 +113,7 @@ export function BenchmarkResults({ data }: BenchmarkResultsProps) {
         aum,
         viewMode: feeViewMode,
         feeType: data.existing?.feeType || 'unbundled',
+        aiSummary: aiSummary,
       });
     } catch (error) {
       console.error("Error exporting to PowerPoint:", error);
@@ -101,12 +123,27 @@ export function BenchmarkResults({ data }: BenchmarkResultsProps) {
 
   return (
     <div className="space-y-8">
-      {/* Export Button */}
-      <div className="flex justify-end">
+      {/* Export Button and Generate Summary Button */}
+      <div className="flex justify-between items-center">
+        {!showSummary && (
+          <Button onClick={() => setShowSummary(true)} variant="outline">
+            Generate AI Summary
+          </Button>
+        )}
+        {showSummary && <div></div>}
         <Button onClick={handleExport} variant="default">
           Export to PowerPoint
         </Button>
       </div>
+
+      {/* AI Executive Summary - Only show after user clicks generate */}
+      {showSummary && (
+        <ExecutiveSummary
+          summaryRequest={aiSummaryRequest}
+          autoGenerate={true}
+          onSummaryGenerated={handleSummaryGenerated}
+        />
+      )}
 
       {/* Fee Benchmark Comparison Chart */}
       <Card>

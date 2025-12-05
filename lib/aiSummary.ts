@@ -1,0 +1,241 @@
+import type { AISummaryRequest } from './types';
+
+/**
+ * Builds a structured prompt for Azure OpenAI to generate an executive summary
+ * of retirement plan fee benchmarking results.
+ *
+ * The prompt combines:
+ * - Plan metadata (AUM, participants, benchmark bucket)
+ * - Calculated fee breakdowns (dollar amounts and percentages)
+ * - Benchmark comparisons (percentile positioning)
+ * - Proposed plan data if available for savings analysis
+ *
+ * Designed to produce stable, consistent output grounded in provided data.
+ */
+export function buildSummaryPrompt(request: AISummaryRequest): string {
+  const {
+    planData,
+    calculatedFees,
+    benchmarks,
+    proposedPlanData,
+    proposedCalculatedFees,
+    aumBucket,
+  } = request;
+
+  // Format currency helper
+  const formatCurrency = (amount: number) =>
+    `$${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+  // Format percentage helper
+  const formatPercent = (decimal: number) =>
+    `${(decimal * 100).toFixed(2)}%`;
+
+  // Determine percentile position for a fee
+  const getPercentilePosition = (feePercent: number, percentiles: { p25: number; p50: number; p75: number }): string => {
+    if (feePercent <= percentiles.p25) return 'below the 25th percentile (excellent)';
+    if (feePercent <= percentiles.p50) return 'between the 25th and 50th percentile (very good)';
+    if (feePercent <= percentiles.p75) return 'between the 50th and 75th percentile (average)';
+    return 'above the 75th percentile (above market)';
+  };
+
+  const aum = planData.assetsUnderManagement || 0;
+  const participants = planData.participantCount || 0;
+
+  let prompt = `You are an expert retirement plan consultant analyzing fee benchmarking data. Generate a professional executive summary suitable for both advisors and plan sponsors.
+
+PLAN DETAILS:
+- Assets Under Management: ${formatCurrency(aum)}
+- Number of Participants: ${participants.toLocaleString()}
+- AUM Benchmark Category: ${aumBucket}
+
+CURRENT PLAN FEE STRUCTURE:
+
+Advisor Fee:
+- Amount: ${formatCurrency(calculatedFees.advisor.dollarAmount)} (${formatPercent(calculatedFees.advisor.percentage)} of AUM)
+- Market Position: ${getPercentilePosition(calculatedFees.advisor.percentage, benchmarks.advisor)}
+- Benchmarks: 25th=${formatPercent(benchmarks.advisor.p25)}, 50th=${formatPercent(benchmarks.advisor.p50)}, 75th=${formatPercent(benchmarks.advisor.p75)}
+
+Record Keeper Fee:
+- Amount: ${formatCurrency(calculatedFees.recordKeeper.dollarAmount)} (${formatPercent(calculatedFees.recordKeeper.percentage)} of AUM)
+- Market Position: ${getPercentilePosition(calculatedFees.recordKeeper.percentage, benchmarks.recordKeeper)}
+- Benchmarks: 25th=${formatPercent(benchmarks.recordKeeper.p25)}, 50th=${formatPercent(benchmarks.recordKeeper.p50)}, 75th=${formatPercent(benchmarks.recordKeeper.p75)}
+
+TPA Fee:
+- Amount: ${formatCurrency(calculatedFees.tpa.dollarAmount)} (${formatPercent(calculatedFees.tpa.percentage)} of AUM)
+- Market Position: ${getPercentilePosition(calculatedFees.tpa.percentage, benchmarks.tpa)}
+- Benchmarks: 25th=${formatPercent(benchmarks.tpa.p25)}, 50th=${formatPercent(benchmarks.tpa.p50)}, 75th=${formatPercent(benchmarks.tpa.p75)}
+
+Investment Menu Fee:
+- Amount: ${formatCurrency(calculatedFees.investmentMenu.dollarAmount)} (${formatPercent(calculatedFees.investmentMenu.percentage)} of AUM)
+- Market Position: ${getPercentilePosition(calculatedFees.investmentMenu.percentage, benchmarks.investmentMenu)}
+- Benchmarks: 25th=${formatPercent(benchmarks.investmentMenu.p25)}, 50th=${formatPercent(benchmarks.investmentMenu.p50)}, 75th=${formatPercent(benchmarks.investmentMenu.p75)}
+
+TOTAL FEES:
+- Amount: ${formatCurrency(calculatedFees.total.dollarAmount)} (${formatPercent(calculatedFees.total.percentage)} of AUM)
+- Market Position: ${getPercentilePosition(calculatedFees.total.percentage, benchmarks.total)}
+- Benchmarks: 25th=${formatPercent(benchmarks.total.p25)}, 50th=${formatPercent(benchmarks.total.p50)}, 75th=${formatPercent(benchmarks.total.p75)}`;
+
+  // Add proposed plan comparison if available
+  if (proposedCalculatedFees && proposedPlanData) {
+    const savings = calculatedFees.total.dollarAmount - proposedCalculatedFees.total.dollarAmount;
+    const savingsPercent = calculatedFees.total.percentage - proposedCalculatedFees.total.percentage;
+
+    prompt += `
+
+PROPOSED PLAN FEE STRUCTURE:
+
+Advisor Fee: ${formatCurrency(proposedCalculatedFees.advisor.dollarAmount)} (${formatPercent(proposedCalculatedFees.advisor.percentage)})
+Record Keeper Fee: ${formatCurrency(proposedCalculatedFees.recordKeeper.dollarAmount)} (${formatPercent(proposedCalculatedFees.recordKeeper.percentage)})
+TPA Fee: ${formatCurrency(proposedCalculatedFees.tpa.dollarAmount)} (${formatPercent(proposedCalculatedFees.tpa.percentage)})
+Investment Menu Fee: ${formatCurrency(proposedCalculatedFees.investmentMenu.dollarAmount)} (${formatPercent(proposedCalculatedFees.investmentMenu.percentage)})
+
+PROPOSED TOTAL FEES: ${formatCurrency(proposedCalculatedFees.total.dollarAmount)} (${formatPercent(proposedCalculatedFees.total.percentage)} of AUM)
+
+POTENTIAL SAVINGS:
+- Dollar Savings: ${formatCurrency(Math.abs(savings))} ${savings > 0 ? 'saved' : 'increased'}
+- Percentage Point Change: ${formatPercent(Math.abs(savingsPercent))} ${savingsPercent > 0 ? 'reduction' : 'increase'}`;
+  }
+
+  prompt += `
+
+INSTRUCTIONS:
+Generate a concise executive summary (3-5 paragraphs) that:
+
+1. Opens with an overall assessment of the plan's fee competitiveness
+2. Highlights specific fee components that are notably above or below market
+3. Identifies the most significant opportunities for improvement${proposedCalculatedFees ? ' and quantifies the value of the proposed changes' : ''}
+4. Provides 2-3 actionable recommendations for the plan sponsor
+5. Maintains a professional, objective tone suitable for client-facing materials
+
+Focus on insights that matter to plan fiduciaries. Ground all statements in the data provided above - do not make assumptions or add information not present in the data.
+
+Format the response in clear paragraphs with occasional bold text for emphasis on key metrics.`;
+
+  return prompt;
+}
+
+/**
+ * Validates that required environment variables for Azure OpenAI are present
+ */
+export function validateAzureConfig(): { valid: boolean; error?: string } {
+  const required = [
+    'AZURE_OPENAI_ENDPOINT',
+    'AZURE_OPENAI_API_KEY',
+    'AZURE_OPENAI_DEPLOYMENT',
+  ];
+
+  for (const key of required) {
+    if (!process.env[key]) {
+      return {
+        valid: false,
+        error: `Missing required environment variable: ${key}`,
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Generates a dummy executive summary for development/demo purposes
+ * when Azure OpenAI is not configured.
+ */
+export function generateDummySummary(request: AISummaryRequest): string {
+  const { calculatedFees, benchmarks, proposedCalculatedFees, aumBucket } = request;
+  const aum = request.planData.assetsUnderManagement || 0;
+  const participants = request.planData.participantCount || 0;
+
+  const formatCurrency = (amount: number) =>
+    `$${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+  const formatPercent = (decimal: number) =>
+    `${(decimal * 100).toFixed(2)}%`;
+
+  // Determine overall competitiveness
+  const totalFeePercentile = calculatedFees.total.percentage <= benchmarks.total.p25 ? 'excellent' :
+    calculatedFees.total.percentage <= benchmarks.total.p50 ? 'very competitive' :
+    calculatedFees.total.percentage <= benchmarks.total.p75 ? 'moderately competitive' : 'above market';
+
+  // Find highest cost area
+  const feeTypes = ['advisor', 'recordKeeper', 'tpa', 'investmentMenu'] as const;
+  let highestCostArea = 'advisor';
+  let highestPercentile = 0;
+
+  feeTypes.forEach(type => {
+    const fee = calculatedFees[type].percentage;
+    const benchmark = benchmarks[type];
+    if (fee > benchmark.p75) {
+      const percentileScore = (fee - benchmark.p50) / benchmark.p50;
+      if (percentileScore > highestPercentile) {
+        highestPercentile = percentileScore;
+        highestCostArea = type;
+      }
+    }
+  });
+
+  const areaNames: Record<string, string> = {
+    advisor: 'advisor fee',
+    recordKeeper: 'record keeper fee',
+    tpa: 'TPA fee',
+    investmentMenu: 'investment menu fee'
+  };
+
+  let summary = `This retirement plan with **${formatCurrency(aum)}** in assets serving **${participants.toLocaleString()} participants** demonstrates **${totalFeePercentile}** fee competitiveness relative to industry benchmarks in the ${aumBucket} AUM category. The total plan fee of **${formatPercent(calculatedFees.total.percentage)}** provides important context for evaluating the overall value proposition.\n\n`;
+
+  // Paragraph 2: Specific fee analysis
+  const advisorPosition = calculatedFees.advisor.percentage <= benchmarks.advisor.p25 ? 'well below the 25th percentile' :
+    calculatedFees.advisor.percentage <= benchmarks.advisor.p50 ? 'between the 25th and 50th percentile' :
+    calculatedFees.advisor.percentage <= benchmarks.advisor.p75 ? 'between the 50th and 75th percentile' : 'above the 75th percentile';
+
+  const rkPosition = calculatedFees.recordKeeper.percentage <= benchmarks.recordKeeper.p25 ? 'well below the 25th percentile' :
+    calculatedFees.recordKeeper.percentage <= benchmarks.recordKeeper.p50 ? 'between the 25th and 50th percentile' :
+    calculatedFees.recordKeeper.percentage <= benchmarks.recordKeeper.p75 ? 'between the 50th and 75th percentile' : 'above the 75th percentile';
+
+  summary += `The **advisor fee** at ${formatPercent(calculatedFees.advisor.percentage)} positions ${advisorPosition}, while the **record keeper fee** at ${formatPercent(calculatedFees.recordKeeper.percentage)} falls ${rkPosition}. `;
+
+  if (calculatedFees.tpa.percentage > 0.0001) {
+    const tpaPosition = calculatedFees.tpa.percentage <= benchmarks.tpa.p25 ? 'below market' :
+      calculatedFees.tpa.percentage <= benchmarks.tpa.p75 ? 'at market' : 'above market';
+    summary += `The TPA fee of ${formatPercent(calculatedFees.tpa.percentage)} is ${tpaPosition}. `;
+  }
+
+  if (highestPercentile > 0.2) {
+    summary += `The **${areaNames[highestCostArea]}** represents the highest opportunity area for potential cost optimization.\n\n`;
+  } else {
+    summary += `Overall, the fee structure demonstrates balanced pricing across all major components.\n\n`;
+  }
+
+  // Paragraph 3: Proposed plan or investment menu
+  if (proposedCalculatedFees) {
+    const savings = calculatedFees.total.dollarAmount - proposedCalculatedFees.total.dollarAmount;
+    const savingsPercent = calculatedFees.total.percentage - proposedCalculatedFees.total.percentage;
+
+    if (savings > 0) {
+      summary += `Analysis of the proposed plan structure reveals a **significant opportunity for cost reduction**. The proposed fee structure would reduce total fees from **${formatCurrency(calculatedFees.total.dollarAmount)}** to **${formatCurrency(proposedCalculatedFees.total.dollarAmount)}**, representing **annual savings of ${formatCurrency(savings)}** or **${formatPercent(Math.abs(savingsPercent))}** in percentage terms. These savings would directly benefit participant account balances and improve long-term retirement outcomes.\n\n`;
+    } else {
+      summary += `The proposed plan structure shows a fee increase of **${formatCurrency(Math.abs(savings))}**, which should be evaluated against any enhanced services or features provided. Plan fiduciaries should carefully document the rationale for any fee increases to maintain compliance with ERISA prudence standards.\n\n`;
+    }
+  } else {
+    const invPosition = calculatedFees.investmentMenu.percentage <= benchmarks.investmentMenu.p25 ? 'exceptional value, well below market benchmarks' :
+      calculatedFees.investmentMenu.percentage <= benchmarks.investmentMenu.p50 ? 'good value relative to market' :
+      calculatedFees.investmentMenu.percentage <= benchmarks.investmentMenu.p75 ? 'aligned with market standards' : 'above market averages';
+    summary += `The **investment menu fee** at ${formatPercent(calculatedFees.investmentMenu.percentage)} demonstrates ${invPosition}. This component should be evaluated in the context of the investment lineup quality, fund performance, and available investment options.\n\n`;
+  }
+
+  // Paragraph 4: Recommendations
+  summary += `**Recommended actions** for plan fiduciaries include: **(1)** Document this fee benchmarking analysis as evidence of ongoing fiduciary oversight and ERISA compliance, **(2)** `;
+
+  if (highestPercentile > 0.2) {
+    summary += `Consider conducting a competitive RFP process or fee negotiation specifically targeting the ${areaNames[highestCostArea]} to optimize plan costs, **(3)** `;
+  } else {
+    summary += `Continue annual fee benchmarking to ensure ongoing competitiveness, **(3)** `;
+  }
+
+  if (proposedCalculatedFees && (calculatedFees.total.dollarAmount - proposedCalculatedFees.total.dollarAmount) > 0) {
+    summary += `Proceed with implementation of the proposed fee structure after confirming service level agreements and transition timelines with proposed vendors.`;
+  } else {
+    summary += `Review participant communication materials to ensure transparency around plan fees and investment costs.`;
+  }
+
+  return summary;
+}
