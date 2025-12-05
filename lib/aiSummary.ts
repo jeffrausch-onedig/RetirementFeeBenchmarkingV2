@@ -157,9 +157,9 @@ export function validateAzureConfig(): { valid: boolean; error?: string } {
  * when Azure OpenAI is not configured.
  */
 export function generateDummySummary(request: AISummaryRequest): string {
-  const { calculatedFees, benchmarks, proposedCalculatedFees, aumBucket } = request;
-  const aum = request.planData.assetsUnderManagement || 0;
-  const participants = request.planData.participantCount || 0;
+  const { calculatedFees, benchmarks, proposedCalculatedFees, aumBucket, planData, proposedPlanData } = request;
+  const aum = planData.assetsUnderManagement || 0;
+  const participants = planData.participantCount || 0;
 
   const formatCurrency = (amount: number) =>
     `$${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -168,6 +168,28 @@ export function generateDummySummary(request: AISummaryRequest): string {
   // So we don't multiply by 100 here
   const formatPercent = (percentage: number) =>
     `${percentage.toFixed(2)}%`;
+
+  // Helper to count services
+  const countServices = (services: any): number => {
+    if (!services) return 0;
+    return Object.values(services).filter(v => v === true).length;
+  };
+
+  // Helper to get service context for a provider
+  const getServiceContext = (providerKey: 'advisor' | 'recordKeeper' | 'tpa' | 'audit'): string => {
+    const services = planData.services?.[providerKey];
+    const count = countServices(services);
+    if (count === 0) return '';
+
+    const serviceLabels: Record<string, string> = {
+      advisor: 'comprehensive advisory services',
+      recordKeeper: 'full-service recordkeeping',
+      tpa: 'complete TPA services',
+      audit: 'audit services'
+    };
+
+    return ` with ${serviceLabels[providerKey]} (${count} service${count > 1 ? 's' : ''} included)`;
+  };
 
   // Determine overall competitiveness
   const totalFeePercentile = calculatedFees.total.percentage <= benchmarks.total.p25 ? 'excellent' :
@@ -209,12 +231,22 @@ export function generateDummySummary(request: AISummaryRequest): string {
     calculatedFees.recordKeeper.percentage <= benchmarks.recordKeeper.p50 ? 'between the 25th and 50th percentile' :
     calculatedFees.recordKeeper.percentage <= benchmarks.recordKeeper.p75 ? 'between the 50th and 75th percentile' : 'above the 75th percentile';
 
-  summary += `The **advisor fee** at ${formatPercent(calculatedFees.advisor.percentage)} positions ${advisorPosition}, while the **record keeper fee** at ${formatPercent(calculatedFees.recordKeeper.percentage)} falls ${rkPosition}. `;
+  summary += `The **advisor fee** at ${formatPercent(calculatedFees.advisor.percentage)} positions ${advisorPosition}${getServiceContext('advisor')}, while the **record keeper fee** at ${formatPercent(calculatedFees.recordKeeper.percentage)} falls ${rkPosition}${getServiceContext('recordKeeper')}. `;
 
   if (calculatedFees.tpa.percentage > 0.0001) {
     const tpaPosition = calculatedFees.tpa.percentage <= benchmarks.tpa.p25 ? 'below market' :
       calculatedFees.tpa.percentage <= benchmarks.tpa.p75 ? 'at market' : 'above market';
-    summary += `The TPA fee of ${formatPercent(calculatedFees.tpa.percentage)} is ${tpaPosition}. `;
+    summary += `The TPA fee of ${formatPercent(calculatedFees.tpa.percentage)} is ${tpaPosition}${getServiceContext('tpa')}. `;
+  }
+
+  // Add service value assessment
+  const totalServices = countServices(planData.services?.advisor) +
+                       countServices(planData.services?.recordKeeper) +
+                       countServices(planData.services?.tpa) +
+                       countServices(planData.services?.audit);
+
+  if (totalServices > 0 && calculatedFees.total.percentage > benchmarks.total.p50) {
+    summary += `It's worth noting that the fee structure includes **${totalServices} documented service${totalServices > 1 ? 's' : ''}**, which may justify costs above the median benchmark. `;
   }
 
   if (highestPercentile > 0.2) {
@@ -224,14 +256,41 @@ export function generateDummySummary(request: AISummaryRequest): string {
   }
 
   // Paragraph 3: Proposed plan or investment menu
-  if (proposedCalculatedFees) {
+  if (proposedCalculatedFees && proposedPlanData) {
     const savings = calculatedFees.total.dollarAmount - proposedCalculatedFees.total.dollarAmount;
     const savingsPercent = calculatedFees.total.percentage - proposedCalculatedFees.total.percentage;
 
+    // Compare service levels
+    const existingServices = totalServices;
+    const proposedServices = countServices(proposedPlanData.services?.advisor) +
+                            countServices(proposedPlanData.services?.recordKeeper) +
+                            countServices(proposedPlanData.services?.tpa) +
+                            countServices(proposedPlanData.services?.audit);
+
     if (savings > 0) {
-      summary += `Analysis of the proposed plan structure reveals a **significant opportunity for cost reduction**. The proposed fee structure would reduce total fees from **${formatCurrency(calculatedFees.total.dollarAmount)}** to **${formatCurrency(proposedCalculatedFees.total.dollarAmount)}**, representing **annual savings of ${formatCurrency(savings)}** or **${formatPercent(Math.abs(savingsPercent))}** in percentage terms. These savings would directly benefit participant account balances and improve long-term retirement outcomes.\n\n`;
+      summary += `Analysis of the proposed plan structure reveals a **significant opportunity for cost reduction**. The proposed fee structure would reduce total fees from **${formatCurrency(calculatedFees.total.dollarAmount)}** to **${formatCurrency(proposedCalculatedFees.total.dollarAmount)}**, representing **annual savings of ${formatCurrency(savings)}** or **${formatPercent(Math.abs(savingsPercent))}** in percentage terms. `;
+
+      // Comment on service level changes
+      if (proposedServices > 0 && existingServices > 0) {
+        const serviceDelta = proposedServices - existingServices;
+        if (serviceDelta < 0) {
+          summary += `However, this reduction comes with **${Math.abs(serviceDelta)} fewer service${Math.abs(serviceDelta) > 1 ? 's' : ''}** (${proposedServices} vs ${existingServices}), which should be carefully evaluated to ensure no critical capabilities are being eliminated. `;
+        } else if (serviceDelta > 0) {
+          summary += `Notably, the proposed plan includes **${serviceDelta} additional service${serviceDelta > 1 ? 's' : ''}** (${proposedServices} vs ${existingServices}), representing enhanced value at lower cost. `;
+        }
+      }
+
+      summary += `These savings would directly benefit participant account balances and improve long-term retirement outcomes.\n\n`;
     } else {
-      summary += `The proposed plan structure shows a fee increase of **${formatCurrency(Math.abs(savings))}**, which should be evaluated against any enhanced services or features provided. Plan fiduciaries should carefully document the rationale for any fee increases to maintain compliance with ERISA prudence standards.\n\n`;
+      summary += `The proposed plan structure shows a fee increase of **${formatCurrency(Math.abs(savings))}**, which should be evaluated against any enhanced services or features provided. `;
+
+      // Justify fee increases with service enhancements
+      if (proposedServices > existingServices) {
+        const serviceDelta = proposedServices - existingServices;
+        summary += `The increase is accompanied by **${serviceDelta} additional service${serviceDelta > 1 ? 's' : ''}** (${proposedServices} vs ${existingServices}), which may justify the higher fees through enhanced participant support and plan administration. `;
+      }
+
+      summary += `Plan fiduciaries should carefully document the rationale for any fee increases to maintain compliance with ERISA prudence standards.\n\n`;
     }
   } else {
     const invPosition = calculatedFees.investmentMenu.percentage <= benchmarks.investmentMenu.p25 ? 'exceptional value, well below market benchmarks' :
