@@ -11,6 +11,7 @@ import { FeeBenchmarkChart } from "./charts/FeeBenchmarkChart";
 import { ItemizedFeeChart, FeeViewMode } from "./charts/ItemizedFeeChart";
 import { Button } from "@/components/ui/button";
 import { ExecutiveSummary } from "./ExecutiveSummary";
+import ServiceComparison from "./ServiceComparison";
 import type { AISummaryRequest } from "@/lib/types";
 
 interface BenchmarkResultsProps {
@@ -242,6 +243,12 @@ export function BenchmarkResults({ data }: BenchmarkResultsProps) {
           <p className="text-sm text-muted-foreground mt-4 italic">{disclaimerText}</p>
         </CardContent>
       </Card>
+
+      {/* Service Comparison */}
+      <ServiceComparison
+        existingServices={data.existing?.services}
+        proposedServices={data.proposed?.services}
+      />
 
       {/* Debug data (can be removed later) */}
       <Card>

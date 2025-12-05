@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { ComparisonData, FeeStructure, FeeStructureType, PlanData, AUMBenchmarkCategory, BalanceBenchmarkCategory, PlanFeeType } from "@/lib/types";
+import { ComparisonData, FeeStructure, FeeStructureType, PlanData, AUMBenchmarkCategory, BalanceBenchmarkCategory, PlanFeeType, ServiceOptions } from "@/lib/types";
+import ServiceOptionsInput from "@/components/ServiceOptionsInput";
 
 const AUM_CATEGORIES: AUMBenchmarkCategory[] = [
   '$0-250k',
@@ -71,6 +72,12 @@ const emptyPlanData: PlanData = {
     recordKeeper: { ...emptyFeeStructure },
     tpa: { ...emptyFeeStructure },
     investmentMenu: { ...emptyFeeStructure },
+  },
+  services: {
+    advisor: {},
+    recordKeeper: {},
+    tpa: {},
+    audit: {},
   },
 };
 
@@ -302,6 +309,13 @@ export function FeeInputForm({ onSubmit }: FeeInputFormProps) {
         </CardContent>
       </Card>
 
+      {/* Existing Plan Service Options */}
+      <ServiceOptionsInput
+        planType="existing"
+        services={existingPlan.services || { advisor: {}, recordKeeper: {}, tpa: {}, audit: {} }}
+        onChange={(services) => updateExistingPlanField('services', services)}
+      />
+
       {/* Add Proposed Plan Button or Proposed Plan Section */}
       {!includeProposed ? (
         <div className="mt-6">
@@ -316,86 +330,95 @@ export function FeeInputForm({ onSubmit }: FeeInputFormProps) {
           </Button>
         </div>
       ) : (
-        <Card className="mt-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Proposed Plan Fee Structures</CardTitle>
-                <CardDescription>
-                  Enter proposed fee structures to compare against existing plan (uses same plan size)
-                </CardDescription>
+        <>
+          <Card className="mt-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Proposed Plan Fee Structures</CardTitle>
+                  <CardDescription>
+                    Enter proposed fee structures to compare against existing plan (uses same plan size)
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIncludeProposed(false)}
+                >
+                  Remove
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setIncludeProposed(false)}
-              >
-                Remove
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Proposed Plan Fee Inputs */}
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Fee Details</h3>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Proposed Plan Fee Inputs */}
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Fee Details</h3>
 
-                {/* Fee Type Toggle */}
-                <div className="space-y-2">
-                  <Label>Fee Type *</Label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="proposed-fee-type"
-                        value="bundled"
-                        checked={proposedPlan.feeType === 'bundled'}
-                        onChange={(e) => updateProposedPlanField('feeType', 'bundled')}
-                        className="w-4 h-4"
-                      />
-                      <span>Bundled</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="proposed-fee-type"
-                        value="unbundled"
-                        checked={proposedPlan.feeType === 'unbundled'}
-                        onChange={(e) => updateProposedPlanField('feeType', 'unbundled')}
-                        className="w-4 h-4"
-                      />
-                      <span>Unbundled</span>
-                    </label>
+                  {/* Fee Type Toggle */}
+                  <div className="space-y-2">
+                    <Label>Fee Type *</Label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="proposed-fee-type"
+                          value="bundled"
+                          checked={proposedPlan.feeType === 'bundled'}
+                          onChange={(e) => updateProposedPlanField('feeType', 'bundled')}
+                          className="w-4 h-4"
+                        />
+                        <span>Bundled</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="proposed-fee-type"
+                          value="unbundled"
+                          checked={proposedPlan.feeType === 'unbundled'}
+                          onChange={(e) => updateProposedPlanField('feeType', 'unbundled')}
+                          className="w-4 h-4"
+                        />
+                        <span>Unbundled</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <FeeStructureInput
-                label="Advisor Fee"
-                feeStructure={proposedPlan.fees.advisor}
-                onChange={(updates) => updateProposedFeeStructure('advisor', updates)}
-              />
-              <FeeStructureInput
-                label="Record Keeper Fee"
-                feeStructure={proposedPlan.fees.recordKeeper}
-                onChange={(updates) => updateProposedFeeStructure('recordKeeper', updates)}
-              />
-              {proposedPlan.feeType === 'unbundled' && (
                 <FeeStructureInput
-                  label="TPA Fee"
-                  feeStructure={proposedPlan.fees.tpa}
-                  onChange={(updates) => updateProposedFeeStructure('tpa', updates)}
+                  label="Advisor Fee"
+                  feeStructure={proposedPlan.fees.advisor}
+                  onChange={(updates) => updateProposedFeeStructure('advisor', updates)}
                 />
-              )}
-              <FeeStructureInput
-                label="Investment Menu Fee"
-                feeStructure={proposedPlan.fees.investmentMenu}
-                onChange={(updates) => updateProposedFeeStructure('investmentMenu', updates)}
-              />
-            </div>
-          </CardContent>
-        </Card>
+                <FeeStructureInput
+                  label="Record Keeper Fee"
+                  feeStructure={proposedPlan.fees.recordKeeper}
+                  onChange={(updates) => updateProposedFeeStructure('recordKeeper', updates)}
+                />
+                {proposedPlan.feeType === 'unbundled' && (
+                  <FeeStructureInput
+                    label="TPA Fee"
+                    feeStructure={proposedPlan.fees.tpa}
+                    onChange={(updates) => updateProposedFeeStructure('tpa', updates)}
+                  />
+                )}
+                <FeeStructureInput
+                  label="Investment Menu Fee"
+                  feeStructure={proposedPlan.fees.investmentMenu}
+                  onChange={(updates) => updateProposedFeeStructure('investmentMenu', updates)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Proposed Plan Service Options */}
+          <ServiceOptionsInput
+            planType="proposed"
+            services={proposedPlan.services || { advisor: {}, recordKeeper: {}, tpa: {}, audit: {} }}
+            onChange={(services) => updateProposedPlanField('services', services)}
+          />
+        </>
       )}
 
       <div className="mt-6">

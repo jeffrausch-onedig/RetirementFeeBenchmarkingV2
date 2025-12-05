@@ -16,6 +16,57 @@ export interface FeeInput {
   investmentMenu: FeeStructure;
 }
 
+// Service options for each provider type
+export interface AdvisorServices {
+  planDesignConsulting?: boolean;
+  investmentMenuSelection?: boolean;
+  participantEducation?: boolean;
+  fiduciarySupport321?: boolean;
+  fiduciarySupport338?: boolean;
+  complianceAssistance?: boolean;
+  quarterlyReviews?: boolean;
+  customReporting?: boolean;
+}
+
+export interface RecordkeeperServices {
+  participantWebsite?: boolean;
+  mobileApp?: boolean;
+  callCenterSupport?: boolean;
+  onlineEnrollment?: boolean;
+  loanAdministration?: boolean;
+  distributionProcessing?: boolean;
+  payrollIntegration?: boolean;
+  dailyValuation?: boolean;
+  autoEnrollment?: boolean;
+  participantStatements?: boolean;
+}
+
+export interface TPAServices {
+  form5500Preparation?: boolean;
+  discriminationTesting?: boolean;
+  planDocumentUpdates?: boolean;
+  amendmentServices?: boolean;
+  noticePrparation?: boolean;
+  complianceTesting?: boolean;
+  governmentFilings?: boolean;
+  participantNotices?: boolean;
+}
+
+export interface AuditServices {
+  fullScopeAudit?: boolean;
+  limitedScopeAudit?: boolean;
+  annualAudit?: boolean;
+  biannualAudit?: boolean;
+  triannualAudit?: boolean;
+}
+
+export interface ServiceOptions {
+  advisor?: AdvisorServices;
+  recordKeeper?: RecordkeeperServices;
+  tpa?: TPAServices;
+  audit?: AuditServices;
+}
+
 // Benchmark data from CSV
 export interface BenchmarkData {
   clientID: string;
@@ -79,6 +130,7 @@ export interface PlanData {
   balanceBenchmarkCategory?: BalanceBenchmarkCategory;
   feeType?: PlanFeeType;
   fees: FeeInput;
+  services?: ServiceOptions;
 }
 
 export interface ComparisonData {

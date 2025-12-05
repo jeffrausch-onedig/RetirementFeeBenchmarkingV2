@@ -41,6 +41,14 @@ export function buildSummaryPrompt(request: AISummaryRequest): string {
   const aum = planData.assetsUnderManagement || 0;
   const participants = planData.participantCount || 0;
 
+  // Helper to format service lists
+  const formatServices = (services: any, category: string): string => {
+    if (!services) return '';
+    const selectedServices = Object.keys(services).filter(key => services[key] === true);
+    if (selectedServices.length === 0) return '';
+    return `\n${category} Services Included:\n${selectedServices.map(s => `- ${s.replace(/([A-Z])/g, ' $1').trim()}`).join('\n')}`;
+  };
+
   let prompt = `You are an expert retirement plan consultant analyzing fee benchmarking data. Generate a professional executive summary suitable for both advisors and plan sponsors.
 
 PLAN DETAILS:
@@ -53,22 +61,22 @@ CURRENT PLAN FEE STRUCTURE:
 Advisor Fee:
 - Amount: ${formatCurrency(calculatedFees.advisor.dollarAmount)} (${formatPercent(calculatedFees.advisor.percentage)} of AUM)
 - Market Position: ${getPercentilePosition(calculatedFees.advisor.percentage, benchmarks.advisor)}
-- Benchmarks: 25th=${formatPercent(benchmarks.advisor.p25)}, 50th=${formatPercent(benchmarks.advisor.p50)}, 75th=${formatPercent(benchmarks.advisor.p75)}
+- Benchmarks: 25th=${formatPercent(benchmarks.advisor.p25)}, 50th=${formatPercent(benchmarks.advisor.p50)}, 75th=${formatPercent(benchmarks.advisor.p75)}${formatServices(planData.services?.advisor, 'Advisor')}
 
 Record Keeper Fee:
 - Amount: ${formatCurrency(calculatedFees.recordKeeper.dollarAmount)} (${formatPercent(calculatedFees.recordKeeper.percentage)} of AUM)
 - Market Position: ${getPercentilePosition(calculatedFees.recordKeeper.percentage, benchmarks.recordKeeper)}
-- Benchmarks: 25th=${formatPercent(benchmarks.recordKeeper.p25)}, 50th=${formatPercent(benchmarks.recordKeeper.p50)}, 75th=${formatPercent(benchmarks.recordKeeper.p75)}
+- Benchmarks: 25th=${formatPercent(benchmarks.recordKeeper.p25)}, 50th=${formatPercent(benchmarks.recordKeeper.p50)}, 75th=${formatPercent(benchmarks.recordKeeper.p75)}${formatServices(planData.services?.recordKeeper, 'Recordkeeper')}
 
 TPA Fee:
 - Amount: ${formatCurrency(calculatedFees.tpa.dollarAmount)} (${formatPercent(calculatedFees.tpa.percentage)} of AUM)
 - Market Position: ${getPercentilePosition(calculatedFees.tpa.percentage, benchmarks.tpa)}
-- Benchmarks: 25th=${formatPercent(benchmarks.tpa.p25)}, 50th=${formatPercent(benchmarks.tpa.p50)}, 75th=${formatPercent(benchmarks.tpa.p75)}
+- Benchmarks: 25th=${formatPercent(benchmarks.tpa.p25)}, 50th=${formatPercent(benchmarks.tpa.p50)}, 75th=${formatPercent(benchmarks.tpa.p75)}${formatServices(planData.services?.tpa, 'TPA')}
 
 Investment Menu Fee:
 - Amount: ${formatCurrency(calculatedFees.investmentMenu.dollarAmount)} (${formatPercent(calculatedFees.investmentMenu.percentage)} of AUM)
 - Market Position: ${getPercentilePosition(calculatedFees.investmentMenu.percentage, benchmarks.investmentMenu)}
-- Benchmarks: 25th=${formatPercent(benchmarks.investmentMenu.p25)}, 50th=${formatPercent(benchmarks.investmentMenu.p50)}, 75th=${formatPercent(benchmarks.investmentMenu.p75)}
+- Benchmarks: 25th=${formatPercent(benchmarks.investmentMenu.p25)}, 50th=${formatPercent(benchmarks.investmentMenu.p50)}, 75th=${formatPercent(benchmarks.investmentMenu.p75)}${formatServices(planData.services?.audit, 'Audit')}
 
 TOTAL FEES:
 - Amount: ${formatCurrency(calculatedFees.total.dollarAmount)} (${formatPercent(calculatedFees.total.percentage)} of AUM)
@@ -84,16 +92,21 @@ TOTAL FEES:
 
 PROPOSED PLAN FEE STRUCTURE:
 
-Advisor Fee: ${formatCurrency(proposedCalculatedFees.advisor.dollarAmount)} (${formatPercent(proposedCalculatedFees.advisor.percentage)})
-Record Keeper Fee: ${formatCurrency(proposedCalculatedFees.recordKeeper.dollarAmount)} (${formatPercent(proposedCalculatedFees.recordKeeper.percentage)})
-TPA Fee: ${formatCurrency(proposedCalculatedFees.tpa.dollarAmount)} (${formatPercent(proposedCalculatedFees.tpa.percentage)})
-Investment Menu Fee: ${formatCurrency(proposedCalculatedFees.investmentMenu.dollarAmount)} (${formatPercent(proposedCalculatedFees.investmentMenu.percentage)})
+Advisor Fee: ${formatCurrency(proposedCalculatedFees.advisor.dollarAmount)} (${formatPercent(proposedCalculatedFees.advisor.percentage)})${formatServices(proposedPlanData.services?.advisor, 'Proposed Advisor')}
+
+Record Keeper Fee: ${formatCurrency(proposedCalculatedFees.recordKeeper.dollarAmount)} (${formatPercent(proposedCalculatedFees.recordKeeper.percentage)})${formatServices(proposedPlanData.services?.recordKeeper, 'Proposed Recordkeeper')}
+
+TPA Fee: ${formatCurrency(proposedCalculatedFees.tpa.dollarAmount)} (${formatPercent(proposedCalculatedFees.tpa.percentage)})${formatServices(proposedPlanData.services?.tpa, 'Proposed TPA')}
+
+Investment Menu Fee: ${formatCurrency(proposedCalculatedFees.investmentMenu.dollarAmount)} (${formatPercent(proposedCalculatedFees.investmentMenu.percentage)})${formatServices(proposedPlanData.services?.audit, 'Proposed Audit')}
 
 PROPOSED TOTAL FEES: ${formatCurrency(proposedCalculatedFees.total.dollarAmount)} (${formatPercent(proposedCalculatedFees.total.percentage)} of AUM)
 
 POTENTIAL SAVINGS:
 - Dollar Savings: ${formatCurrency(Math.abs(savings))} ${savings > 0 ? 'saved' : 'increased'}
-- Percentage Point Change: ${formatPercent(Math.abs(savingsPercent))} ${savingsPercent > 0 ? 'reduction' : 'increase'}`;
+- Percentage Point Change: ${formatPercent(Math.abs(savingsPercent))} ${savingsPercent > 0 ? 'reduction' : 'increase'}
+
+NOTE: When evaluating fee changes, consider the services included with each provider. Higher fees may be justified by enhanced service offerings, while lower fees should be evaluated to ensure no critical services are being eliminated.`;
   }
 
   prompt += `
@@ -103,11 +116,12 @@ Generate a concise executive summary (3-5 paragraphs) that:
 
 1. Opens with an overall assessment of the plan's fee competitiveness
 2. Highlights specific fee components that are notably above or below market
-3. Identifies the most significant opportunities for improvement${proposedCalculatedFees ? ' and quantifies the value of the proposed changes' : ''}
-4. Provides 2-3 actionable recommendations for the plan sponsor
-5. Maintains a professional, objective tone suitable for client-facing materials
+3. **IMPORTANT**: When discussing fees, consider the services included with each provider. Comment on whether fee levels appear reasonable given the scope of services provided. For example, higher advisor fees may be justified by comprehensive fiduciary support, participant education, and quarterly reviews.
+4. Identifies the most significant opportunities for improvement${proposedCalculatedFees ? ', quantifies the value of the proposed changes, and discusses any differences in service levels between existing and proposed providers' : ''}
+5. Provides 2-3 actionable recommendations for the plan sponsor
+6. Maintains a professional, objective tone suitable for client-facing materials
 
-Focus on insights that matter to plan fiduciaries. Ground all statements in the data provided above - do not make assumptions or add information not present in the data.
+Focus on insights that matter to plan fiduciaries. Ground all statements in the data provided above - do not make assumptions or add information not present in the data. Pay special attention to the relationship between fees and services - a lower fee is not always better if it means reduced service quality or eliminated features that benefit participants.
 
 Format the response in clear paragraphs with occasional bold text for emphasis on key metrics.`;
 
