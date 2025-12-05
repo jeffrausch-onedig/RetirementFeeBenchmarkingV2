@@ -27,8 +27,10 @@ export function buildSummaryPrompt(request: AISummaryRequest): string {
     `$${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
   // Format percentage helper
-  const formatPercent = (decimal: number) =>
-    `${(decimal * 100).toFixed(2)}%`;
+  // Note: calculatedFees.percentage values are already percentages (e.g., 0.9 for 0.9%)
+  // So we don't multiply by 100 here
+  const formatPercent = (percentage: number) =>
+    `${percentage.toFixed(2)}%`;
 
   // Determine percentile position for a fee
   const getPercentilePosition = (feePercent: number, percentiles: { p25: number; p50: number; p75: number }): string => {
@@ -162,8 +164,10 @@ export function generateDummySummary(request: AISummaryRequest): string {
   const formatCurrency = (amount: number) =>
     `$${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
-  const formatPercent = (decimal: number) =>
-    `${(decimal * 100).toFixed(2)}%`;
+  // Note: calculatedFees.percentage values are already percentages (e.g., 0.9 for 0.9%)
+  // So we don't multiply by 100 here
+  const formatPercent = (percentage: number) =>
+    `${percentage.toFixed(2)}%`;
 
   // Determine overall competitiveness
   const totalFeePercentile = calculatedFees.total.percentage <= benchmarks.total.p25 ? 'excellent' :
