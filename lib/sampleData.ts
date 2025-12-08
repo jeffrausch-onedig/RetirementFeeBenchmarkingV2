@@ -1,0 +1,428 @@
+/**
+ * Sample data generator for development and testing purposes
+ * Generates realistic retirement plan data for quick testing
+ */
+
+import type { PlanData, ServiceOptions, AUMBenchmarkCategory, BalanceBenchmarkCategory } from './types';
+
+/**
+ * Determines the appropriate AUM benchmark category based on plan AUM
+ */
+function getAUMBenchmarkCategory(aum: number): AUMBenchmarkCategory {
+  if (aum < 250_000) return '$0-250k';
+  if (aum < 500_000) return '$250-500k';
+  if (aum < 1_000_000) return '$500k-1m';
+  if (aum < 3_000_000) return '$1-3m';
+  if (aum < 5_000_000) return '$3-5m';
+  if (aum < 10_000_000) return '$5-10m';
+  if (aum < 20_000_000) return '$10-20m';
+  if (aum < 30_000_000) return '$20-30m';
+  if (aum < 50_000_000) return '$30-50m';
+  if (aum < 100_000_000) return '$50-100m';
+  if (aum < 250_000_000) return '$100-250m';
+  return '> $250m';
+}
+
+/**
+ * Determines the appropriate balance benchmark category based on average balance
+ */
+function getBalanceBenchmarkCategory(avgBalance: number): BalanceBenchmarkCategory {
+  if (avgBalance < 25_000) return '$0-25k';
+  if (avgBalance < 50_000) return '$25-50k';
+  if (avgBalance < 75_000) return '$50-75k';
+  if (avgBalance < 100_000) return '$75-100k';
+  return '> $100k';
+}
+
+/**
+ * Generates realistic sample plan data
+ * Returns both existing and proposed plan configurations
+ */
+export function generateSamplePlanData(): {
+  existing: PlanData;
+  proposed: PlanData;
+} {
+  // Generate a random AUM between $1M and $50M
+  const aum = Math.floor(Math.random() * 49_000_000) + 1_000_000;
+
+  // Participant count roughly correlated with AUM (average $50k-$150k per participant)
+  const avgBalance = Math.floor(Math.random() * 100_000) + 50_000;
+  const participants = Math.floor(aum / avgBalance);
+
+  // Sample services - existing plan has comprehensive services
+  const existingServices: ServiceOptions = {
+    advisor: {
+      investmentMenuSelection: true,
+      fiduciarySupport321: true,
+      complianceAssistance: true,
+      planDesignConsulting: true,
+      participantEducation: true,
+      quarterlyReviews: true,
+      fiduciarySupport338: false,
+      customReporting: false,
+    },
+    recordKeeper: {
+      participantWebsite: true,
+      callCenterSupport: true,
+      onlineEnrollment: true,
+      mobileApp: true,
+      loanAdministration: true,
+      dailyValuation: true,
+      participantStatements: true,
+      payrollIntegration: false,
+      autoEnrollment: true,
+      distributionProcessing: true,
+    },
+    tpa: {
+      form5500Preparation: true,
+      discriminationTesting: true,
+      complianceTesting: true,
+      planDocumentUpdates: true,
+      governmentFilings: true,
+      participantNotices: true,
+      amendmentServices: false,
+      noticePrparation: false,
+    },
+    audit: {
+      annualAudit: participants >= 100,
+      fullScopeAudit: participants >= 100,
+      limitedScopeAudit: false,
+      biannualAudit: false,
+      triannualAudit: false,
+    },
+  };
+
+  // Proposed services - slightly enhanced
+  const proposedServices: ServiceOptions = {
+    advisor: {
+      investmentMenuSelection: true,
+      fiduciarySupport321: true,
+      complianceAssistance: true,
+      planDesignConsulting: true,
+      participantEducation: true,
+      quarterlyReviews: true,
+      fiduciarySupport338: true, // Upgraded to 3(38)
+      customReporting: true,
+    },
+    recordKeeper: {
+      participantWebsite: true,
+      callCenterSupport: true,
+      onlineEnrollment: true,
+      mobileApp: true,
+      loanAdministration: true,
+      dailyValuation: true,
+      participantStatements: true,
+      payrollIntegration: true, // Added payroll integration
+      autoEnrollment: true,
+      distributionProcessing: true,
+    },
+    tpa: {
+      form5500Preparation: true,
+      discriminationTesting: true,
+      complianceTesting: true,
+      planDocumentUpdates: true,
+      governmentFilings: true,
+      participantNotices: true,
+      amendmentServices: true, // Added amendment services
+      noticePrparation: true,
+    },
+    audit: {
+      annualAudit: participants >= 100,
+      fullScopeAudit: false,
+      limitedScopeAudit: participants >= 100, // Switched to limited scope
+      biannualAudit: false,
+      triannualAudit: false,
+    },
+  };
+
+  // Generate realistic fee structures
+  // Advisor: typically 50-100 basis points for mid-market plans
+  const advisorBps = Math.floor(Math.random() * 50) + 50;
+
+  // Recordkeeper: varies by plan size, typically 25-75 bps or flat fee
+  const recordkeeperBps = aum > 10_000_000
+    ? Math.floor(Math.random() * 30) + 25
+    : 0;
+  const recordkeeperFlat = aum <= 10_000_000
+    ? Math.floor(Math.random() * 15_000) + 10_000
+    : 0;
+
+  // TPA: usually flat + per participant
+  const tpaFlat = Math.floor(Math.random() * 3_000) + 2_000;
+  const tpaPerHead = Math.floor(Math.random() * 30) + 40;
+
+  // Investment menu: 15-35 basis points
+  const investmentMenuBps = Math.floor(Math.random() * 20) + 15;
+
+  // Calculate benchmark categories based on AUM and average balance
+  const benchmarkCategory = getAUMBenchmarkCategory(aum);
+  const balanceBenchmarkCategory = getBalanceBenchmarkCategory(avgBalance);
+
+  const existing: PlanData = {
+    assetsUnderManagement: aum,
+    participantCount: participants,
+    benchmarkCategory,
+    balanceBenchmarkCategory,
+    feeType: 'unbundled',
+    fees: {
+      advisor: {
+        type: 'basisPoints',
+        basisPoints: advisorBps,
+      },
+      recordKeeper: recordkeeperBps > 0
+        ? {
+            type: 'basisPoints',
+            basisPoints: recordkeeperBps,
+          }
+        : {
+            type: 'flatFee',
+            flatFee: recordkeeperFlat,
+          },
+      tpa: {
+        type: 'flatPlusPerHead',
+        flatFee: tpaFlat,
+        perParticipantFee: tpaPerHead,
+      },
+      investmentMenu: {
+        type: 'basisPoints',
+        basisPoints: investmentMenuBps,
+      },
+    },
+    services: existingServices,
+  };
+
+  // Proposed plan with slightly lower fees (10-20% reduction)
+  const proposedAdvisorBps = Math.floor(advisorBps * 0.85);
+  const proposedRecordkeeperBps = recordkeeperBps > 0
+    ? Math.floor(recordkeeperBps * 0.9)
+    : 0;
+  const proposedRecordkeeperFlat = recordkeeperFlat > 0
+    ? Math.floor(recordkeeperFlat * 0.9)
+    : 0;
+  const proposedTpaFlat = Math.floor(tpaFlat * 0.95);
+  const proposedTpaPerHead = Math.floor(tpaPerHead * 0.95);
+  const proposedInvestmentMenuBps = Math.floor(investmentMenuBps * 0.9);
+
+  const proposed: PlanData = {
+    assetsUnderManagement: aum,
+    participantCount: participants,
+    benchmarkCategory,
+    balanceBenchmarkCategory,
+    feeType: 'unbundled',
+    fees: {
+      advisor: {
+        type: 'basisPoints',
+        basisPoints: proposedAdvisorBps,
+      },
+      recordKeeper: proposedRecordkeeperBps > 0
+        ? {
+            type: 'basisPoints',
+            basisPoints: proposedRecordkeeperBps,
+          }
+        : {
+            type: 'flatFee',
+            flatFee: proposedRecordkeeperFlat,
+          },
+      tpa: {
+        type: 'flatPlusPerHead',
+        flatFee: proposedTpaFlat,
+        perParticipantFee: proposedTpaPerHead,
+      },
+      investmentMenu: {
+        type: 'basisPoints',
+        basisPoints: proposedInvestmentMenuBps,
+      },
+    },
+    services: proposedServices,
+  };
+
+  return { existing, proposed };
+}
+
+/**
+ * Generates a variety of sample scenarios for different testing cases
+ */
+export const sampleScenarios = {
+  smallPlan: (): { existing: PlanData; proposed: PlanData } => {
+    const aum = 2_500_000;
+    const participants = 35;
+    const avgBalance = aum / participants; // ~$71,428
+
+    return {
+      existing: {
+        assetsUnderManagement: aum,
+        participantCount: participants,
+        benchmarkCategory: getAUMBenchmarkCategory(aum), // $1-3m
+        balanceBenchmarkCategory: getBalanceBenchmarkCategory(avgBalance), // $50-75k
+        feeType: 'unbundled',
+        fees: {
+          advisor: { type: 'basisPoints', basisPoints: 100 },
+          recordKeeper: { type: 'flatFee', flatFee: 15_000 },
+          tpa: { type: 'flatPlusPerHead', flatFee: 3_000, perParticipantFee: 75 },
+          investmentMenu: { type: 'basisPoints', basisPoints: 30 },
+        },
+        services: {
+          advisor: {
+            investmentMenuSelection: true,
+            fiduciarySupport321: true,
+            complianceAssistance: true,
+          },
+          recordKeeper: {
+            participantWebsite: true,
+            callCenterSupport: true,
+            onlineEnrollment: true,
+          },
+          tpa: {
+            form5500Preparation: true,
+            discriminationTesting: true,
+            complianceTesting: true,
+          },
+          audit: {},
+        },
+      },
+      proposed: {
+        assetsUnderManagement: aum,
+        participantCount: participants,
+        benchmarkCategory: getAUMBenchmarkCategory(aum), // $1-3m
+        balanceBenchmarkCategory: getBalanceBenchmarkCategory(avgBalance), // $50-75k
+        feeType: 'unbundled',
+        fees: {
+          advisor: { type: 'basisPoints', basisPoints: 85 },
+          recordKeeper: { type: 'flatFee', flatFee: 12_000 },
+          tpa: { type: 'flatPlusPerHead', flatFee: 2_500, perParticipantFee: 65 },
+          investmentMenu: { type: 'basisPoints', basisPoints: 25 },
+        },
+        services: {
+          advisor: {
+            investmentMenuSelection: true,
+            fiduciarySupport321: true,
+            complianceAssistance: true,
+            planDesignConsulting: true,
+          },
+          recordKeeper: {
+            participantWebsite: true,
+            callCenterSupport: true,
+            onlineEnrollment: true,
+            mobileApp: true,
+          },
+          tpa: {
+            form5500Preparation: true,
+            discriminationTesting: true,
+            complianceTesting: true,
+            planDocumentUpdates: true,
+          },
+          audit: {},
+        },
+      },
+    };
+  },
+
+  largePlan: (): { existing: PlanData; proposed: PlanData } => {
+    const aum = 75_000_000;
+    const participants = 850;
+    const avgBalance = aum / participants; // ~$88,235
+
+    return {
+      existing: {
+        assetsUnderManagement: aum,
+        participantCount: participants,
+        benchmarkCategory: getAUMBenchmarkCategory(aum), // $50-100m
+        balanceBenchmarkCategory: getBalanceBenchmarkCategory(avgBalance), // $75-100k
+        feeType: 'unbundled',
+        fees: {
+          advisor: { type: 'basisPoints', basisPoints: 40 },
+          recordKeeper: { type: 'basisPoints', basisPoints: 30 },
+          tpa: { type: 'flatPlusPerHead', flatFee: 5_000, perParticipantFee: 35 },
+          investmentMenu: { type: 'basisPoints', basisPoints: 18 },
+        },
+        services: {
+          advisor: {
+            investmentMenuSelection: true,
+            fiduciarySupport321: true,
+            complianceAssistance: true,
+            planDesignConsulting: true,
+            participantEducation: true,
+            quarterlyReviews: true,
+            customReporting: true,
+          },
+          recordKeeper: {
+            participantWebsite: true,
+            callCenterSupport: true,
+            onlineEnrollment: true,
+            mobileApp: true,
+            loanAdministration: true,
+            dailyValuation: true,
+            participantStatements: true,
+            payrollIntegration: true,
+            autoEnrollment: true,
+            distributionProcessing: true,
+          },
+          tpa: {
+            form5500Preparation: true,
+            discriminationTesting: true,
+            complianceTesting: true,
+            planDocumentUpdates: true,
+            governmentFilings: true,
+            participantNotices: true,
+            amendmentServices: true,
+          },
+          audit: {
+            annualAudit: true,
+            limitedScopeAudit: true,
+          },
+        },
+      },
+      proposed: {
+        assetsUnderManagement: aum,
+        participantCount: participants,
+        benchmarkCategory: getAUMBenchmarkCategory(aum), // $50-100m
+        balanceBenchmarkCategory: getBalanceBenchmarkCategory(avgBalance), // $75-100k
+        feeType: 'unbundled',
+        fees: {
+          advisor: { type: 'basisPoints', basisPoints: 35 },
+          recordKeeper: { type: 'basisPoints', basisPoints: 25 },
+          tpa: { type: 'flatPlusPerHead', flatFee: 4_500, perParticipantFee: 30 },
+          investmentMenu: { type: 'basisPoints', basisPoints: 15 },
+        },
+        services: {
+          advisor: {
+            investmentMenuSelection: true,
+            fiduciarySupport321: true,
+            fiduciarySupport338: true,
+            complianceAssistance: true,
+            planDesignConsulting: true,
+            participantEducation: true,
+            quarterlyReviews: true,
+            customReporting: true,
+          },
+          recordKeeper: {
+            participantWebsite: true,
+            callCenterSupport: true,
+            onlineEnrollment: true,
+            mobileApp: true,
+            loanAdministration: true,
+            dailyValuation: true,
+            participantStatements: true,
+            payrollIntegration: true,
+            autoEnrollment: true,
+            distributionProcessing: true,
+          },
+          tpa: {
+            form5500Preparation: true,
+            discriminationTesting: true,
+            complianceTesting: true,
+            planDocumentUpdates: true,
+            governmentFilings: true,
+            participantNotices: true,
+            amendmentServices: true,
+            noticePrparation: true,
+          },
+          audit: {
+            annualAudit: true,
+            limitedScopeAudit: true,
+          },
+        },
+      },
+    };
+  },
+};

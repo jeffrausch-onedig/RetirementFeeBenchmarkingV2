@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { ComparisonData, FeeStructure, FeeStructureType, PlanData, AUMBenchmarkCategory, BalanceBenchmarkCategory, PlanFeeType, ServiceOptions } from "@/lib/types";
-import ServiceOptionsInput from "@/components/ServiceOptionsInput";
+import ServiceSelectionTable from "@/components/ServiceSelectionTable";
+import { generateSamplePlanData, sampleScenarios } from "@/lib/sampleData";
 
 const AUM_CATEGORIES: AUMBenchmarkCategory[] = [
   '$0-250k',
@@ -164,8 +165,38 @@ export function FeeInputForm({ onSubmit }: FeeInputFormProps) {
     });
   };
 
+  const loadSampleData = () => {
+    const sampleData = generateSamplePlanData();
+    setExistingPlan(sampleData.existing);
+    setProposedPlan(sampleData.proposed);
+    setIncludeProposed(true);
+  };
+
+  // Check if we're in development mode (hide button in production)
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
   return (
     <form onSubmit={handleSubmit}>
+      {/* Development-only sample data button */}
+      {isDevelopment && (
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-yellow-800">Development Mode</h3>
+              <p className="text-xs text-yellow-700">Quickly populate the form with realistic sample data</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={loadSampleData}
+              className="bg-yellow-100 hover:bg-yellow-200 border-yellow-300"
+            >
+              Load Sample Data
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Benchmark Category Selection */}
       <Card>
         <CardHeader>
@@ -309,13 +340,6 @@ export function FeeInputForm({ onSubmit }: FeeInputFormProps) {
         </CardContent>
       </Card>
 
-      {/* Existing Plan Service Options */}
-      <ServiceOptionsInput
-        planType="existing"
-        services={existingPlan.services || { advisor: {}, recordKeeper: {}, tpa: {}, audit: {} }}
-        onChange={(services) => updateExistingPlanField('services', services)}
-      />
-
       {/* Add Proposed Plan Button or Proposed Plan Section */}
       {!includeProposed ? (
         <div className="mt-6">
@@ -340,14 +364,29 @@ export function FeeInputForm({ onSubmit }: FeeInputFormProps) {
                     Enter proposed fee structures to compare against existing plan (uses same plan size)
                   </CardDescription>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIncludeProposed(false)}
-                >
-                  Remove
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setProposedPlan({
+                        ...existingPlan,
+                        // Keep the existing structure but copy all fees and services
+                      });
+                    }}
+                  >
+                    Copy from Existing
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIncludeProposed(false)}
+                  >
+                    Remove
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -411,15 +450,17 @@ export function FeeInputForm({ onSubmit }: FeeInputFormProps) {
               </div>
             </CardContent>
           </Card>
-
-          {/* Proposed Plan Service Options */}
-          <ServiceOptionsInput
-            planType="proposed"
-            services={proposedPlan.services || { advisor: {}, recordKeeper: {}, tpa: {}, audit: {} }}
-            onChange={(services) => updateProposedPlanField('services', services)}
-          />
         </>
       )}
+
+      {/* Service Selection Table - shows after proposed plan fees */}
+      <ServiceSelectionTable
+        existingServices={existingPlan.services || { advisor: {}, recordKeeper: {}, tpa: {}, audit: {} }}
+        proposedServices={includeProposed ? (proposedPlan.services || { advisor: {}, recordKeeper: {}, tpa: {}, audit: {} }) : undefined}
+        onExistingChange={(services) => updateExistingPlanField('services', services)}
+        onProposedChange={includeProposed ? (services) => updateProposedPlanField('services', services) : undefined}
+        showProposed={includeProposed}
+      />
 
       <div className="mt-6">
         <Button type="submit" className="w-full" size="lg">

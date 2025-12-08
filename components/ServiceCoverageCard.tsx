@@ -1,0 +1,230 @@
+'use client';
+
+import React from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertCircle, CheckCircle, TrendingUp, TrendingDown } from 'lucide-react';
+import type { ServiceOptions } from '@/lib/types';
+import {
+  calculateServiceValueScore,
+  calculateServiceCoverage,
+  advisorServiceBaseline,
+  recordkeeperServiceBaseline,
+  tpaServiceBaseline,
+  auditServiceBaseline,
+  getPlanSizeCategory,
+  planSizeExpectations
+} from '@/lib/serviceBaselines';
+
+interface ServiceCoverageCardProps {
+  services: ServiceOptions;
+  aum: number;
+  planType: 'existing' | 'proposed';
+  comparisonServices?: ServiceOptions; // For showing delta vs. other plan
+}
+
+export default function ServiceCoverageCard({
+  services,
+  aum,
+  planType,
+  comparisonServices
+}: ServiceCoverageCardProps) {
+  const valueScore = calculateServiceValueScore(services, aum);
+  const comparisonScore = comparisonServices
+    ? calculateServiceValueScore(comparisonServices, aum)
+    : null;
+
+  const planSize = getPlanSizeCategory(aum);
+  const expectations = planSizeExpectations[planSize];
+
+  // Calculate coverage for each provider
+  const advisorCoverage = calculateServiceCoverage(
+    services.advisor,
+    advisorServiceBaseline
+  );
+  const recordkeeperCoverage = calculateServiceCoverage(
+    services.recordKeeper,
+    recordkeeperServiceBaseline
+  );
+  const tpaCoverage = calculateServiceCoverage(services.tpa, tpaServiceBaseline);
+  const auditCoverage = calculateServiceCoverage(
+    services.audit,
+    auditServiceBaseline
+  );
+
+  // Helper to get score color
+  const getScoreColor = (score: number): string => {
+    if (score >= 75) return 'text-green-600';
+    if (score >= 50) return 'text-yellow-600';
+    return 'text-orange-600';
+  };
+
+  const getScoreBgColor = (score: number): string => {
+    if (score >= 75) return 'bg-green-50 border-green-200';
+    if (score >= 50) return 'bg-yellow-50 border-yellow-200';
+    return 'bg-orange-50 border-orange-200';
+  };
+
+  // Helper to render tier progress bar
+  const renderTierProgress = (
+    label: string,
+    provided: number,
+    total: number,
+    percentage: number,
+    tierColor: string
+  ) => {
+    return (
+      <div className="space-y-1">
+        <div className="flex justify-between items-center text-xs">
+          <span className="font-medium text-muted-foreground">{label}</span>
+          <span className="text-xs font-semibold">
+            {provided}/{total} ({Math.round(percentage)}%)
+          </span>
+        </div>
+        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className={`h-full ${tierColor} transition-all duration-300`}
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  // Helper to render provider score card
+  const renderProviderCard = (
+    title: string,
+    score: number,
+    coverage: ReturnType<typeof calculateServiceCoverage>
+  ) => {
+    const tierColors = {
+      essential: 'bg-red-500',
+      standard: 'bg-blue-500',
+      premium: 'bg-purple-500'
+    };
+
+    return (
+      <div className="border rounded-md p-3 space-y-2 bg-white hover:shadow-sm transition-shadow">
+        <div className="flex justify-between items-start">
+          <h4 className="font-semibold text-sm">{title}</h4>
+          <span className={`text-lg font-bold ${getScoreColor(score)}`}>
+            {score}
+          </span>
+        </div>
+        <div className="space-y-1.5">
+          {renderTierProgress(
+            'Essential',
+            coverage.essential.provided,
+            coverage.essential.total,
+            coverage.essential.percentage,
+            tierColors.essential
+          )}
+          {renderTierProgress(
+            'Standard',
+            coverage.standard.provided,
+            coverage.standard.total,
+            coverage.standard.percentage,
+            tierColors.standard
+          )}
+          {renderTierProgress(
+            'Premium',
+            coverage.premium.provided,
+            coverage.premium.total,
+            coverage.premium.percentage,
+            tierColors.premium
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-lg">
+              Service Coverage - {planType === 'existing' ? 'Current Plan' : 'Proposed Plan'}
+            </CardTitle>
+            <CardDescription className="text-xs mt-1">
+              Analysis based on {planSize === 'under5M' ? 'small' : planSize === '5M-50M' ? 'mid-market' : 'large'} plan expectations
+            </CardDescription>
+          </div>
+          <div className={`border rounded-lg px-4 py-2 ${getScoreBgColor(valueScore.score)}`}>
+            <div className="text-center">
+              <div className={`text-2xl font-bold mb-0.5 ${getScoreColor(valueScore.score)}`}>
+                {valueScore.score}
+              </div>
+              <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                Service Score
+              </div>
+              {comparisonScore && (
+                <div className="flex items-center justify-center gap-1 mt-1">
+                  {valueScore.score > comparisonScore.score ? (
+                    <>
+                      <TrendingUp className="h-3 w-3 text-green-600" />
+                      <span className="text-[10px] font-semibold text-green-600">
+                        +{valueScore.score - comparisonScore.score}
+                      </span>
+                    </>
+                  ) : valueScore.score < comparisonScore.score ? (
+                    <>
+                      <TrendingDown className="h-3 w-3 text-red-600" />
+                      <span className="text-[10px] font-semibold text-red-600">
+                        {valueScore.score - comparisonScore.score}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">No change</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Insights/Warnings */}
+        {valueScore.insights.length > 0 && (
+          <div className="space-y-1.5">
+            {valueScore.insights.map((insight, index) => (
+              <div
+                key={index}
+                className="flex items-start gap-2 text-xs bg-orange-50 border border-orange-200 rounded-md p-2"
+              >
+                <AlertCircle className="h-3.5 w-3.5 text-orange-600 mt-0.5 flex-shrink-0" />
+                <span className="text-orange-800">{insight}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* No issues message */}
+        {valueScore.insights.length === 0 && valueScore.score >= 75 && (
+          <div className="flex items-center gap-2 text-xs bg-green-50 border border-green-200 rounded-md p-2">
+            <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+            <span className="text-green-800">
+              All essential services included. Service package appropriate for plan size.
+            </span>
+          </div>
+        )}
+
+        {/* Provider breakdown grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {renderProviderCard('Advisor', valueScore.breakdown.advisor, advisorCoverage)}
+          {renderProviderCard(
+            'Recordkeeper',
+            valueScore.breakdown.recordKeeper,
+            recordkeeperCoverage
+          )}
+          {renderProviderCard('TPA', valueScore.breakdown.tpa, tpaCoverage)}
+          {renderProviderCard('Audit', valueScore.breakdown.audit, auditCoverage)}
+        </div>
+
+        {/* Plan size expectations note */}
+        <div className="text-[10px] text-muted-foreground bg-muted/20 px-2 py-1.5 rounded-md">
+          <span className="font-semibold">Plan Size Guidance:</span> {expectations.notes}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

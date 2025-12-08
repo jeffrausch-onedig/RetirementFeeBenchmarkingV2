@@ -13,6 +13,19 @@ npm run lint     # Run ESLint
 
 The dev server runs on http://localhost:3000 by default (or next available port).
 
+### Development Tools
+
+**Sample Data Generator** (Development Only)
+- In development mode (`NODE_ENV=development`), a "Load Sample Data" button appears at the top of the form
+- Automatically populates realistic plan data including:
+  - Random AUM between $1M-$50M
+  - Appropriate participant counts
+  - Realistic fee structures (basis points, flat fees, per-participant)
+  - Comprehensive service selections for both existing and proposed plans
+- The button is automatically hidden in production builds
+- Sample data generator: `lib/sampleData.ts`
+- Includes predefined scenarios for small plans (<$5M) and large plans (>$50M)
+
 ## Architecture Overview
 
 This is a Next.js 16 application using App Router that helps retirement plan consultants benchmark plan fees against industry data.

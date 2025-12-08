@@ -12,6 +12,8 @@ import { ItemizedFeeChart, FeeViewMode } from "./charts/ItemizedFeeChart";
 import { Button } from "@/components/ui/button";
 import { ExecutiveSummary } from "./ExecutiveSummary";
 import ServiceComparison from "./ServiceComparison";
+import ServiceCoverageCard from "./ServiceCoverageCard";
+import ServiceRadarChart from "./charts/ServiceRadarChart";
 import type { AISummaryRequest } from "@/lib/types";
 
 interface BenchmarkResultsProps {
@@ -146,6 +148,16 @@ export function BenchmarkResults({ data }: BenchmarkResultsProps) {
         />
       )}
 
+      {/* FEE ANALYSIS SECTION */}
+      <div className="mt-8 mb-4">
+        <div className="border-b-2 border-primary/20 pb-2">
+          <h2 className="text-2xl font-bold text-primary">Fee Analysis</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Comprehensive benchmarking of plan fees against market percentiles
+          </p>
+        </div>
+      </div>
+
       {/* Fee Benchmark Comparison Chart */}
       <Card>
         <CardHeader>
@@ -244,11 +256,88 @@ export function BenchmarkResults({ data }: BenchmarkResultsProps) {
         </CardContent>
       </Card>
 
-      {/* Service Comparison */}
-      <ServiceComparison
-        existingServices={data.existing?.services}
-        proposedServices={data.proposed?.services}
-      />
+      {/* SERVICE ANALYSIS SECTION */}
+      {data.existing?.services && (
+        <>
+          <div className="mt-12 mb-4">
+            <div className="border-b-2 border-primary/20 pb-2">
+              <h2 className="text-2xl font-bold text-primary">Service Analysis</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Evaluation of service coverage and value relative to fees
+              </p>
+            </div>
+          </div>
+
+          {/* Service & Fee Competitiveness Analysis Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div>
+                <CardTitle className="text-lg">Service & Fee Competitiveness Analysis</CardTitle>
+                <CardDescription className="text-xs">
+                  Comprehensive view of service coverage and fee positioning across all providers
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ServiceRadarChart
+                existingServices={data.existing.services}
+                proposedServices={data.proposed?.services}
+                aum={data.existing.assetsUnderManagement || 0}
+                existingFees={existingFees || undefined}
+                proposedFees={proposedFees || undefined}
+                benchmarks={benchmarks || undefined}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Service Coverage Summary Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div>
+                <CardTitle className="text-lg">Service Coverage Summary</CardTitle>
+                <CardDescription className="text-xs">
+                  Detailed breakdown of service scores and tier-level coverage by provider
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <ServiceCoverageCard
+                  services={data.existing.services}
+                  aum={data.existing.assetsUnderManagement || 0}
+                  planType="existing"
+                  comparisonServices={data.proposed?.services}
+                />
+                {data.proposed?.services && (
+                  <ServiceCoverageCard
+                    services={data.proposed.services}
+                    aum={data.proposed.assetsUnderManagement || data.existing.assetsUnderManagement || 0}
+                    planType="proposed"
+                    comparisonServices={data.existing.services}
+                  />
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Detailed Service Comparison */}
+          <Card>
+        <CardHeader>
+          <CardTitle>Detailed Service Comparison</CardTitle>
+          <CardDescription>
+            Complete service-by-service comparison organized by tier (Essential, Standard, Premium)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ServiceComparison
+            existingServices={data.existing?.services}
+            proposedServices={data.proposed?.services}
+            aum={data.existing?.assetsUnderManagement}
+          />
+        </CardContent>
+      </Card>
+        </>
+      )}
 
       {/* Debug data (can be removed later) */}
       <Card>

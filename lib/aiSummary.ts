@@ -1,4 +1,12 @@
 import type { AISummaryRequest } from './types';
+import {
+  calculateServiceValueScore,
+  getMissingEssentialServices,
+  advisorServiceBaseline,
+  recordkeeperServiceBaseline,
+  tpaServiceBaseline,
+  auditServiceBaseline
+} from './serviceBaselines';
 
 /**
  * Builds a structured prompt for Azure OpenAI to generate an executive summary
@@ -8,6 +16,7 @@ import type { AISummaryRequest } from './types';
  * - Plan metadata (AUM, participants, benchmark bucket)
  * - Calculated fee breakdowns (dollar amounts and percentages)
  * - Benchmark comparisons (percentile positioning)
+ * - Service baseline analysis (essential/standard/premium tiers)
  * - Proposed plan data if available for savings analysis
  *
  * Designed to produce stable, consistent output grounded in provided data.
@@ -43,6 +52,50 @@ export function buildSummaryPrompt(request: AISummaryRequest): string {
   const aum = planData.assetsUnderManagement || 0;
   const participants = planData.participantCount || 0;
 
+  // Calculate service value score and get insights
+  const serviceAnalysis = calculateServiceValueScore(planData.services, aum);
+
+  // Get service labels for missing essential services
+  const advisorServiceLabels: Record<string, string> = {
+    planDesignConsulting: 'Plan Design Consulting',
+    investmentMenuSelection: 'Investment Menu Selection',
+    participantEducation: 'Participant Education',
+    fiduciarySupport321: '3(21) Fiduciary Support',
+    fiduciarySupport338: '3(38) Fiduciary Support',
+    complianceAssistance: 'Compliance Assistance',
+    quarterlyReviews: 'Quarterly Performance Reviews',
+    customReporting: 'Custom Reporting'
+  };
+
+  const recordkeeperServiceLabels: Record<string, string> = {
+    participantWebsite: 'Participant Website/Portal',
+    mobileApp: 'Mobile App',
+    callCenterSupport: 'Call Center Support',
+    onlineEnrollment: 'Online Enrollment',
+    loanAdministration: 'Loan Administration',
+    distributionProcessing: 'Distribution Processing',
+    payrollIntegration: 'Payroll Integration',
+    dailyValuation: 'Daily Valuation',
+    autoEnrollment: 'Auto-Enrollment Support',
+    participantStatements: 'Participant Statements'
+  };
+
+  const tpaServiceLabels: Record<string, string> = {
+    form5500Preparation: 'Form 5500 Preparation',
+    discriminationTesting: 'Discrimination Testing',
+    planDocumentUpdates: 'Plan Document Updates',
+    amendmentServices: 'Amendment Services',
+    noticePrparation: 'Notice Preparation',
+    complianceTesting: 'Compliance Testing',
+    governmentFilings: 'Government Filings',
+    participantNotices: 'Participant Notices'
+  };
+
+  // Get missing essential services
+  const missingAdvisor = getMissingEssentialServices(planData.services?.advisor, advisorServiceBaseline, advisorServiceLabels as any);
+  const missingRecordkeeper = getMissingEssentialServices(planData.services?.recordKeeper, recordkeeperServiceBaseline, recordkeeperServiceLabels as any);
+  const missingTPA = getMissingEssentialServices(planData.services?.tpa, tpaServiceBaseline, tpaServiceLabels as any);
+
   // Helper to format service lists
   const formatServices = (services: any, category: string): string => {
     if (!services) return '';
@@ -51,12 +104,13 @@ export function buildSummaryPrompt(request: AISummaryRequest): string {
     return `\n${category} Services Included:\n${selectedServices.map(s => `- ${s.replace(/([A-Z])/g, ' $1').trim()}`).join('\n')}`;
   };
 
-  let prompt = `You are an expert retirement plan consultant analyzing fee benchmarking data. Generate a professional executive summary suitable for both advisors and plan sponsors.
+  let prompt = `You are an expert retirement plan consultant analyzing fee benchmarking data for a comprehensive benchmarking report. This report will be used by plan fiduciaries to evaluate their current plan against market standards${proposedPlanData ? ' and to assess a proposed alternative plan structure' : ''}.
 
 PLAN DETAILS:
 - Assets Under Management: ${formatCurrency(aum)}
 - Number of Participants: ${participants.toLocaleString()}
 - AUM Benchmark Category: ${aumBucket}
+- Average Balance per Participant: ${formatCurrency(aum / participants)}
 
 CURRENT PLAN FEE STRUCTURE:
 
@@ -83,7 +137,20 @@ Investment Menu Fee:
 TOTAL FEES:
 - Amount: ${formatCurrency(calculatedFees.total.dollarAmount)} (${formatPercent(calculatedFees.total.percentage)} of AUM)
 - Market Position: ${getPercentilePosition(calculatedFees.total.percentage, benchmarks.total)}
-- Benchmarks: 25th=${formatPercent(benchmarks.total.p25)}, 50th=${formatPercent(benchmarks.total.p50)}, 75th=${formatPercent(benchmarks.total.p75)}`;
+- Benchmarks: 25th=${formatPercent(benchmarks.total.p25)}, 50th=${formatPercent(benchmarks.total.p50)}, 75th=${formatPercent(benchmarks.total.p75)}
+
+SERVICE BASELINE ANALYSIS:
+- Overall Service Value Score: ${serviceAnalysis.score}/100
+  - Advisor Services Score: ${serviceAnalysis.breakdown.advisor}/100
+  - Recordkeeper Services Score: ${serviceAnalysis.breakdown.recordKeeper}/100
+  - TPA Services Score: ${serviceAnalysis.breakdown.tpa}/100
+  - Audit Services Score: ${serviceAnalysis.breakdown.audit}/100
+${missingAdvisor.length > 0 ? `\n⚠️ MISSING ESSENTIAL ADVISOR SERVICES:\n${missingAdvisor.map(s => `- ${s}`).join('\n')}` : ''}
+${missingRecordkeeper.length > 0 ? `\n⚠️ MISSING ESSENTIAL RECORDKEEPER SERVICES:\n${missingRecordkeeper.map(s => `- ${s}`).join('\n')}` : ''}
+${missingTPA.length > 0 ? `\n⚠️ MISSING ESSENTIAL TPA SERVICES:\n${missingTPA.map(s => `- ${s}`).join('\n')}` : ''}
+${serviceAnalysis.insights.length > 0 ? `\nService Insights:\n${serviceAnalysis.insights.map(i => `- ${i}`).join('\n')}` : ''}
+
+NOTE: Service scores weight essential services more heavily (3x) than standard (2x) or premium (1x) services. Missing essential services represent potential compliance or operational risks.`;
 
   // Add proposed plan comparison if available
   if (proposedCalculatedFees && proposedPlanData) {
@@ -114,18 +181,43 @@ NOTE: When evaluating fee changes, consider the services included with each prov
   prompt += `
 
 INSTRUCTIONS:
-Generate a concise executive summary (3-5 paragraphs) that:
+Generate a professional executive summary for a fee benchmarking report (3-5 paragraphs) that:
 
-1. Opens with an overall assessment of the plan's fee competitiveness
-2. Highlights specific fee components that are notably above or below market
-3. **IMPORTANT**: When discussing fees, consider the services included with each provider. Comment on whether fee levels appear reasonable given the scope of services provided. For example, higher advisor fees may be justified by comprehensive fiduciary support, participant education, and quarterly reviews.
-4. Identifies the most significant opportunities for improvement${proposedCalculatedFees ? ', quantifies the value of the proposed changes, and discusses any differences in service levels between existing and proposed providers' : ''}
-5. Provides 2-3 actionable recommendations for the plan sponsor
-6. Maintains a professional, objective tone suitable for client-facing materials
+**PARAGRAPH 1 - BENCHMARKING OVERVIEW:**
+- Start with a clear statement of the plan's overall position relative to market benchmarks
+- Include total fee as percentage of AUM and its percentile positioning
+- Reference the Service Value Score as context for evaluating fee competitiveness
+- State whether fees are justified by service levels or if there are concerns
 
-Focus on insights that matter to plan fiduciaries. Ground all statements in the data provided above - do not make assumptions or add information not present in the data. Pay special attention to the relationship between fees and services - a lower fee is not always better if it means reduced service quality or eliminated features that benefit participants.
+**PARAGRAPH 2 - COMPONENT ANALYSIS:**
+- Analyze each major fee component (Advisor, Recordkeeper, TPA, Investment Menu) against benchmarks
+- For each component that is notably above or below market, provide specific percentile context
+- **CRITICAL**: Connect service coverage to fee positioning - e.g., "The advisor fee of X% is above the 75th percentile at Y%, but includes Z comprehensive services"
+- Highlight any missing essential services as potential compliance risks
 
-Format the response in clear paragraphs with occasional bold text for emphasis on key metrics.`;
+**PARAGRAPH 3 - ${proposedCalculatedFees ? 'PROPOSED PLAN COMPARISON' : 'INVESTMENT MENU & OPPORTUNITIES'}:**
+${proposedCalculatedFees ? `- Clearly state the total savings/increase from existing to proposed plan
+- Break down where the major fee differences occur by component
+- **IMPORTANT**: Compare service levels between existing and proposed - are any services being added or removed?
+- Evaluate whether the proposed plan represents better value considering both fees AND services
+- If services are reduced in proposed plan, flag any essential service gaps as risks` : `- Evaluate the investment menu fee against benchmarks
+- Identify the highest-cost component as the primary optimization opportunity
+- Suggest next steps for improving fee competitiveness`}
+
+**PARAGRAPH 4 - RECOMMENDATIONS:**
+- Provide 2-3 specific, actionable recommendations prioritized by impact
+- If essential services are missing, make addressing them the #1 priority
+- If comparing to proposed plan, clearly recommend whether to proceed and why
+- Include a recommendation about documenting this analysis for ERISA compliance
+
+**FORMATTING & TONE:**
+- Use bold text for key metrics (fees, percentages, savings amounts)
+- Maintain professional, objective language suitable for plan sponsor review
+- Ground all statements in the provided data - no assumptions or external information
+- Remember: This is a BENCHMARKING REPORT, not a sales pitch. Present facts objectively.
+
+**SERVICE-FEE RELATIONSHIP:**
+A lower fee is not always better if essential services are missing. Conversely, higher fees can be justified by comprehensive service packages. Always evaluate fees in the context of the Service Value Score and any missing essential services. When comparing existing vs proposed, emphasize that the benchmarking analysis should consider BOTH fee competitiveness AND service adequacy.`;
 
   return prompt;
 }
@@ -168,6 +260,63 @@ export function generateDummySummary(request: AISummaryRequest): string {
   // So we don't multiply by 100 here
   const formatPercent = (percentage: number) =>
     `${percentage.toFixed(2)}%`;
+
+  // Calculate service value scores for existing and proposed
+  const serviceAnalysis = calculateServiceValueScore(planData.services, aum);
+  const proposedServiceAnalysis = proposedPlanData
+    ? calculateServiceValueScore(proposedPlanData.services, aum)
+    : null;
+
+  // Get missing essential services
+  const advisorServiceLabels: Record<string, string> = {
+    planDesignConsulting: 'Plan Design Consulting',
+    investmentMenuSelection: 'Investment Menu Selection',
+    participantEducation: 'Participant Education',
+    fiduciarySupport321: '3(21) Fiduciary Support',
+    fiduciarySupport338: '3(38) Fiduciary Support',
+    complianceAssistance: 'Compliance Assistance',
+    quarterlyReviews: 'Quarterly Performance Reviews',
+    customReporting: 'Custom Reporting'
+  };
+
+  const recordkeeperServiceLabels: Record<string, string> = {
+    participantWebsite: 'Participant Website/Portal',
+    mobileApp: 'Mobile App',
+    callCenterSupport: 'Call Center Support',
+    onlineEnrollment: 'Online Enrollment',
+    loanAdministration: 'Loan Administration',
+    distributionProcessing: 'Distribution Processing',
+    payrollIntegration: 'Payroll Integration',
+    dailyValuation: 'Daily Valuation',
+    autoEnrollment: 'Auto-Enrollment Support',
+    participantStatements: 'Participant Statements'
+  };
+
+  const tpaServiceLabels: Record<string, string> = {
+    form5500Preparation: 'Form 5500 Preparation',
+    discriminationTesting: 'Discrimination Testing',
+    planDocumentUpdates: 'Plan Document Updates',
+    amendmentServices: 'Amendment Services',
+    noticePrparation: 'Notice Preparation',
+    complianceTesting: 'Compliance Testing',
+    governmentFilings: 'Government Filings',
+    participantNotices: 'Participant Notices'
+  };
+
+  const missingAdvisor = getMissingEssentialServices(planData.services?.advisor, advisorServiceBaseline, advisorServiceLabels as any);
+  const missingRecordkeeper = getMissingEssentialServices(planData.services?.recordKeeper, recordkeeperServiceBaseline, recordkeeperServiceLabels as any);
+  const missingTPA = getMissingEssentialServices(planData.services?.tpa, tpaServiceBaseline, tpaServiceLabels as any);
+
+  // Check proposed plan for missing services
+  const proposedMissingAdvisor = proposedPlanData
+    ? getMissingEssentialServices(proposedPlanData.services?.advisor, advisorServiceBaseline, advisorServiceLabels as any)
+    : [];
+  const proposedMissingRecordkeeper = proposedPlanData
+    ? getMissingEssentialServices(proposedPlanData.services?.recordKeeper, recordkeeperServiceBaseline, recordkeeperServiceLabels as any)
+    : [];
+  const proposedMissingTPA = proposedPlanData
+    ? getMissingEssentialServices(proposedPlanData.services?.tpa, tpaServiceBaseline, tpaServiceLabels as any)
+    : [];
 
   // Helper to count services
   const countServices = (services: any): number => {
@@ -220,99 +369,222 @@ export function generateDummySummary(request: AISummaryRequest): string {
     investmentMenu: 'investment menu fee'
   };
 
-  let summary = `This retirement plan with **${formatCurrency(aum)}** in assets serving **${participants.toLocaleString()} participants** demonstrates **${totalFeePercentile}** fee competitiveness relative to industry benchmarks in the ${aumBucket} AUM category. The total plan fee of **${formatPercent(calculatedFees.total.percentage)}** provides important context for evaluating the overall value proposition.\n\n`;
+  // Determine service quality assessment
+  const serviceQuality = serviceAnalysis.score >= 80 ? 'comprehensive' :
+    serviceAnalysis.score >= 60 ? 'adequate' :
+    serviceAnalysis.score >= 40 ? 'limited' : 'concerning';
 
-  // Paragraph 2: Specific fee analysis
-  const advisorPosition = calculatedFees.advisor.percentage <= benchmarks.advisor.p25 ? 'well below the 25th percentile' :
-    calculatedFees.advisor.percentage <= benchmarks.advisor.p50 ? 'between the 25th and 50th percentile' :
-    calculatedFees.advisor.percentage <= benchmarks.advisor.p75 ? 'between the 50th and 75th percentile' : 'above the 75th percentile';
+  // Paragraph 1: Benchmarking Overview
+  let summary = `**BENCHMARKING OVERVIEW**: This retirement plan with **${formatCurrency(aum)}** in assets serving **${participants.toLocaleString()} participants** (avg balance: **${formatCurrency(aum / participants)}**) has been benchmarked against ${aumBucket} AUM category market data. The current total plan fee of **${formatPercent(calculatedFees.total.percentage)} of AUM** (${formatCurrency(calculatedFees.total.dollarAmount)} annually) positions the plan **${totalFeePercentile}** relative to the market median of ${formatPercent(benchmarks.total.p50)}. `;
 
-  const rkPosition = calculatedFees.recordKeeper.percentage <= benchmarks.recordKeeper.p25 ? 'well below the 25th percentile' :
-    calculatedFees.recordKeeper.percentage <= benchmarks.recordKeeper.p50 ? 'between the 25th and 50th percentile' :
-    calculatedFees.recordKeeper.percentage <= benchmarks.recordKeeper.p75 ? 'between the 50th and 75th percentile' : 'above the 75th percentile';
+  summary += `With a **Service Value Score of ${serviceAnalysis.score}/100** indicating ${serviceQuality} service coverage, `;
 
-  summary += `The **advisor fee** at ${formatPercent(calculatedFees.advisor.percentage)} positions ${advisorPosition}${getServiceContext('advisor')}, while the **record keeper fee** at ${formatPercent(calculatedFees.recordKeeper.percentage)} falls ${rkPosition}${getServiceContext('recordKeeper')}. `;
+  if (calculatedFees.total.percentage > benchmarks.total.p50 && serviceAnalysis.score >= 70) {
+    summary += `the above-median fees appear justified by the comprehensive service package included. `;
+  } else if (calculatedFees.total.percentage < benchmarks.total.p50 && serviceAnalysis.score < 60) {
+    summary += `the below-median fees come with a limited service package that may present operational risks. `;
+  } else if (calculatedFees.total.percentage > benchmarks.total.p75 && serviceAnalysis.score < 60) {
+    summary += `the above-market fees combined with limited service coverage represent a significant concern requiring immediate attention. `;
+  } else {
+    summary += `fees and service levels appear reasonably aligned with market standards. `;
+  }
+
+  const totalMissingEssential = missingAdvisor.length + missingRecordkeeper.length + missingTPA.length;
+  if (totalMissingEssential > 0) {
+    summary += `**⚠️ Note**: The plan is missing **${totalMissingEssential} essential service${totalMissingEssential > 1 ? 's' : ''}**, which represents potential compliance and operational risks.\n\n`;
+  } else {
+    summary += `\n\n`;
+  }
+
+  // Paragraph 2: Component Analysis with Service Context
+  summary += `**COMPONENT ANALYSIS**: `;
+
+  const advisorServices = countServices(planData.services?.advisor);
+  const rkServices = countServices(planData.services?.recordKeeper);
+  const tpaServices = countServices(planData.services?.tpa);
+
+  const advisorPosition = calculatedFees.advisor.percentage <= benchmarks.advisor.p25 ? 'below the 25th percentile' :
+    calculatedFees.advisor.percentage <= benchmarks.advisor.p50 ? 'at the lower end of the market' :
+    calculatedFees.advisor.percentage <= benchmarks.advisor.p75 ? 'near the market median' : 'above the 75th percentile';
+
+  summary += `The **advisor fee of ${formatPercent(calculatedFees.advisor.percentage)}** (${formatCurrency(calculatedFees.advisor.dollarAmount)}) positions ${advisorPosition} (median: ${formatPercent(benchmarks.advisor.p50)})`;
+  if (advisorServices > 0) {
+    summary += ` and includes ${advisorServices} documented service${advisorServices > 1 ? 's' : ''} (score: ${serviceAnalysis.breakdown.advisor}/100)`;
+  }
+  summary += `. `;
+
+  const rkPosition = calculatedFees.recordKeeper.percentage <= benchmarks.recordKeeper.p25 ? 'below the 25th percentile' :
+    calculatedFees.recordKeeper.percentage <= benchmarks.recordKeeper.p50 ? 'at the lower end of the market' :
+    calculatedFees.recordKeeper.percentage <= benchmarks.recordKeeper.p75 ? 'near the market median' : 'above the 75th percentile';
+
+  summary += `The **recordkeeper fee of ${formatPercent(calculatedFees.recordKeeper.percentage)}** (${formatCurrency(calculatedFees.recordKeeper.dollarAmount)}) is ${rkPosition} (median: ${formatPercent(benchmarks.recordKeeper.p50)})`;
+  if (rkServices > 0) {
+    summary += ` with ${rkServices} service${rkServices > 1 ? 's' : ''} included (score: ${serviceAnalysis.breakdown.recordKeeper}/100)`;
+  }
+  summary += `. `;
 
   if (calculatedFees.tpa.percentage > 0.0001) {
-    const tpaPosition = calculatedFees.tpa.percentage <= benchmarks.tpa.p25 ? 'below market' :
-      calculatedFees.tpa.percentage <= benchmarks.tpa.p75 ? 'at market' : 'above market';
-    summary += `The TPA fee of ${formatPercent(calculatedFees.tpa.percentage)} is ${tpaPosition}${getServiceContext('tpa')}. `;
+    const tpaPosition = calculatedFees.tpa.percentage <= benchmarks.tpa.p25 ? 'below the 25th percentile' :
+      calculatedFees.tpa.percentage <= benchmarks.tpa.p50 ? 'at the lower end of the market' :
+      calculatedFees.tpa.percentage <= benchmarks.tpa.p75 ? 'near the market median' : 'above the 75th percentile';
+    summary += `The **TPA fee of ${formatPercent(calculatedFees.tpa.percentage)}** (${formatCurrency(calculatedFees.tpa.dollarAmount)}) is ${tpaPosition} (median: ${formatPercent(benchmarks.tpa.p50)})`;
+    if (tpaServices > 0) {
+      summary += ` with ${tpaServices} service${tpaServices > 1 ? 's' : ''} provided (score: ${serviceAnalysis.breakdown.tpa}/100)`;
+    }
+    summary += `. `;
   }
 
-  // Add service value assessment
-  const totalServices = countServices(planData.services?.advisor) +
-                       countServices(planData.services?.recordKeeper) +
-                       countServices(planData.services?.tpa) +
-                       countServices(planData.services?.audit);
-
-  if (totalServices > 0 && calculatedFees.total.percentage > benchmarks.total.p50) {
-    summary += `It's worth noting that the fee structure includes **${totalServices} documented service${totalServices > 1 ? 's' : ''}**, which may justify costs above the median benchmark. `;
+  // Highlight missing essential services by provider
+  if (missingAdvisor.length > 0) {
+    summary += `**⚠️ Advisor Gap**: Missing ${missingAdvisor.length} essential service${missingAdvisor.length > 1 ? 's' : ''}: ${missingAdvisor.slice(0, 2).join(', ')}${missingAdvisor.length > 2 ? ', and others' : ''}. `;
+  }
+  if (missingRecordkeeper.length > 0) {
+    summary += `**⚠️ Recordkeeper Gap**: Missing ${missingRecordkeeper.length} essential service${missingRecordkeeper.length > 1 ? 's' : ''}: ${missingRecordkeeper.slice(0, 2).join(', ')}${missingRecordkeeper.length > 2 ? ', and others' : ''}. `;
+  }
+  if (missingTPA.length > 0) {
+    summary += `**⚠️ TPA Gap**: Missing ${missingTPA.length} essential service${missingTPA.length > 1 ? 's' : ''}: ${missingTPA.slice(0, 2).join(', ')}${missingTPA.length > 2 ? ', and others' : ''}. `;
   }
 
-  if (highestPercentile > 0.2) {
-    summary += `The **${areaNames[highestCostArea]}** represents the highest opportunity area for potential cost optimization.\n\n`;
-  } else {
-    summary += `Overall, the fee structure demonstrates balanced pricing across all major components.\n\n`;
-  }
+  // Investment menu
+  const invPosition = calculatedFees.investmentMenu.percentage <= benchmarks.investmentMenu.p25 ? 'excellent, well below market' :
+    calculatedFees.investmentMenu.percentage <= benchmarks.investmentMenu.p50 ? 'good, below median' :
+    calculatedFees.investmentMenu.percentage <= benchmarks.investmentMenu.p75 ? 'at market levels' : 'above market';
+  summary += `The **investment menu fee of ${formatPercent(calculatedFees.investmentMenu.percentage)}** (${formatCurrency(calculatedFees.investmentMenu.dollarAmount)}) is ${invPosition} (median: ${formatPercent(benchmarks.investmentMenu.p50)}).\n\n`;
 
-  // Paragraph 3: Proposed plan or investment menu
-  if (proposedCalculatedFees && proposedPlanData) {
+  // Paragraph 3: Proposed Plan Comparison or Opportunity Analysis
+  if (proposedCalculatedFees && proposedPlanData && proposedServiceAnalysis) {
     const savings = calculatedFees.total.dollarAmount - proposedCalculatedFees.total.dollarAmount;
     const savingsPercent = calculatedFees.total.percentage - proposedCalculatedFees.total.percentage;
 
-    // Compare service levels
-    const existingServices = totalServices;
-    const proposedServices = countServices(proposedPlanData.services?.advisor) +
-                            countServices(proposedPlanData.services?.recordKeeper) +
-                            countServices(proposedPlanData.services?.tpa) +
-                            countServices(proposedPlanData.services?.audit);
+    // Compare service levels by provider
+    const proposedAdvisorServices = countServices(proposedPlanData.services?.advisor);
+    const proposedRkServices = countServices(proposedPlanData.services?.recordKeeper);
+    const proposedTpaServices = countServices(proposedPlanData.services?.tpa);
+
+    const proposedTotalMissing = proposedMissingAdvisor.length + proposedMissingRecordkeeper.length + proposedMissingTPA.length;
+
+    summary += `**PROPOSED PLAN COMPARISON**: `;
 
     if (savings > 0) {
-      summary += `Analysis of the proposed plan structure reveals a **significant opportunity for cost reduction**. The proposed fee structure would reduce total fees from **${formatCurrency(calculatedFees.total.dollarAmount)}** to **${formatCurrency(proposedCalculatedFees.total.dollarAmount)}**, representing **annual savings of ${formatCurrency(savings)}** or **${formatPercent(Math.abs(savingsPercent))}** in percentage terms. `;
+      summary += `The proposed fee structure demonstrates a **${formatCurrency(savings)} annual cost reduction** (from ${formatPercent(calculatedFees.total.percentage)} to ${formatPercent(proposedCalculatedFees.total.percentage)}), positioning the plan ${proposedCalculatedFees.total.percentage <= benchmarks.total.p25 ? 'well below the 25th percentile' : proposedCalculatedFees.total.percentage <= benchmarks.total.p50 ? 'below the market median' : proposedCalculatedFees.total.percentage <= benchmarks.total.p75 ? 'near the market median' : 'above the 75th percentile'} at ${formatPercent(proposedCalculatedFees.total.percentage)} vs. median of ${formatPercent(benchmarks.total.p50)}. `;
 
-      // Comment on service level changes
-      if (proposedServices > 0 && existingServices > 0) {
-        const serviceDelta = proposedServices - existingServices;
-        if (serviceDelta < 0) {
-          summary += `However, this reduction comes with **${Math.abs(serviceDelta)} fewer service${Math.abs(serviceDelta) > 1 ? 's' : ''}** (${proposedServices} vs ${existingServices}), which should be carefully evaluated to ensure no critical capabilities are being eliminated. `;
-        } else if (serviceDelta > 0) {
-          summary += `Notably, the proposed plan includes **${serviceDelta} additional service${serviceDelta > 1 ? 's' : ''}** (${proposedServices} vs ${existingServices}), representing enhanced value at lower cost. `;
-        }
+      // Detail component-by-component comparison
+      const advisorSavings = calculatedFees.advisor.dollarAmount - proposedCalculatedFees.advisor.dollarAmount;
+      const rkSavings = calculatedFees.recordKeeper.dollarAmount - proposedCalculatedFees.recordKeeper.dollarAmount;
+      const tpaSavings = calculatedFees.tpa.dollarAmount - proposedCalculatedFees.tpa.dollarAmount;
+
+      summary += `Fee reductions by component: `;
+      if (advisorSavings > 0) summary += `Advisor **${formatCurrency(advisorSavings)}** (${proposedAdvisorServices} services, score: ${proposedServiceAnalysis.breakdown.advisor}/100 vs. ${serviceAnalysis.breakdown.advisor}/100), `;
+      if (rkSavings > 0) summary += `Recordkeeper **${formatCurrency(rkSavings)}** (${proposedRkServices} services, score: ${proposedServiceAnalysis.breakdown.recordKeeper}/100 vs. ${serviceAnalysis.breakdown.recordKeeper}/100), `;
+      if (tpaSavings > 0) summary += `TPA **${formatCurrency(tpaSavings)}** (${proposedTpaServices} services, score: ${proposedServiceAnalysis.breakdown.tpa}/100 vs. ${serviceAnalysis.breakdown.tpa}/100). `;
+
+      // Service Value Score comparison
+      const scoreDelta = proposedServiceAnalysis.score - serviceAnalysis.score;
+      summary += `The **proposed Service Value Score of ${proposedServiceAnalysis.score}/100** represents a ${scoreDelta >= 0 ? `${scoreDelta}-point improvement` : `${Math.abs(scoreDelta)}-point reduction`} from the current ${serviceAnalysis.score}/100. `;
+
+      // Critical service gap analysis
+      if (proposedTotalMissing > totalMissingEssential && proposedTotalMissing > 0) {
+        summary += `**⚠️ CONCERN**: The proposed plan introduces **${proposedTotalMissing - totalMissingEssential} additional essential service gap${(proposedTotalMissing - totalMissingEssential) > 1 ? 's' : ''}**, raising total missing essential services to ${proposedTotalMissing}. This may create compliance and operational risks that offset the fee savings. `;
+      } else if (proposedTotalMissing < totalMissingEssential) {
+        summary += `**✓ IMPROVEMENT**: The proposed plan addresses **${totalMissingEssential - proposedTotalMissing} essential service gap${(totalMissingEssential - proposedTotalMissing) > 1 ? 's' : ''}**, reducing missing services from ${totalMissingEssential} to ${proposedTotalMissing}. `;
+      } else if (proposedTotalMissing > 0) {
+        summary += `**NOTE**: The proposed plan maintains ${proposedTotalMissing} missing essential service${proposedTotalMissing > 1 ? 's' : ''} that should be addressed. `;
       }
 
-      summary += `These savings would directly benefit participant account balances and improve long-term retirement outcomes.\n\n`;
+      summary += `\n\n`;
     } else {
-      summary += `The proposed plan structure shows a fee increase of **${formatCurrency(Math.abs(savings))}**, which should be evaluated against any enhanced services or features provided. `;
+      summary += `The proposed plan shows a **${formatCurrency(Math.abs(savings))} annual fee increase** (from ${formatPercent(calculatedFees.total.percentage)} to ${formatPercent(proposedCalculatedFees.total.percentage)}). `;
 
-      // Justify fee increases with service enhancements
-      if (proposedServices > existingServices) {
-        const serviceDelta = proposedServices - existingServices;
-        summary += `The increase is accompanied by **${serviceDelta} additional service${serviceDelta > 1 ? 's' : ''}** (${proposedServices} vs ${existingServices}), which may justify the higher fees through enhanced participant support and plan administration. `;
+      // Justify with service improvements
+      const scoreDelta = proposedServiceAnalysis.score - serviceAnalysis.score;
+      if (scoreDelta > 10) {
+        summary += `This increase is accompanied by a **significant ${scoreDelta}-point service improvement** (from ${serviceAnalysis.score}/100 to ${proposedServiceAnalysis.score}/100), which may justify the higher fees through enhanced capabilities. `;
       }
 
-      summary += `Plan fiduciaries should carefully document the rationale for any fee increases to maintain compliance with ERISA prudence standards.\n\n`;
+      if (proposedTotalMissing < totalMissingEssential) {
+        summary += `The proposed plan addresses **${totalMissingEssential - proposedTotalMissing} essential service gap${(totalMissingEssential - proposedTotalMissing) > 1 ? 's' : ''}**, improving compliance and operational effectiveness. `;
+      }
+
+      summary += `Plan fiduciaries should carefully document the rationale for fee increases to maintain compliance with ERISA prudence standards.\n\n`;
     }
   } else {
-    const invPosition = calculatedFees.investmentMenu.percentage <= benchmarks.investmentMenu.p25 ? 'exceptional value, well below market benchmarks' :
-      calculatedFees.investmentMenu.percentage <= benchmarks.investmentMenu.p50 ? 'good value relative to market' :
-      calculatedFees.investmentMenu.percentage <= benchmarks.investmentMenu.p75 ? 'aligned with market standards' : 'above market averages';
-    summary += `The **investment menu fee** at ${formatPercent(calculatedFees.investmentMenu.percentage)} demonstrates ${invPosition}. This component should be evaluated in the context of the investment lineup quality, fund performance, and available investment options.\n\n`;
+    // No proposed plan - identify opportunities
+    summary += `**OPTIMIZATION OPPORTUNITIES**: `;
+
+    if (highestPercentile > 0.2) {
+      const highestCostArea = feeTypes.reduce((highest, type) => {
+        const fee = calculatedFees[type].percentage;
+        const benchmark = benchmarks[type];
+        const percentileScore = (fee - benchmark.p50) / benchmark.p50;
+        const currentHighest = (calculatedFees[highest].percentage - benchmarks[highest].p50) / benchmarks[highest].p50;
+        return percentileScore > currentHighest ? type : highest;
+      }, 'advisor' as const);
+
+      const potentialSavings = calculatedFees[highestCostArea].dollarAmount * 0.15; // Assume 15% reduction possible
+      summary += `The **${areaNames[highestCostArea]}** at ${formatPercent(calculatedFees[highestCostArea].percentage)} (vs. median ${formatPercent(benchmarks[highestCostArea].p50)}) represents the primary cost optimization opportunity. A competitive RFP could potentially generate **${formatCurrency(potentialSavings)} in annual savings** while maintaining or improving service levels. `;
+    }
+
+    if (totalMissingEssential > 0) {
+      summary += `Priority should be given to addressing the **${totalMissingEssential} missing essential service${totalMissingEssential > 1 ? 's' : ''}** to ensure compliance and operational effectiveness. `;
+    } else {
+      summary += `The current service package is comprehensive with all essential services included. `;
+    }
+
+    summary += `\n\n`;
   }
 
   // Paragraph 4: Recommendations
-  summary += `**Recommended actions** for plan fiduciaries include: **(1)** Document this fee benchmarking analysis as evidence of ongoing fiduciary oversight and ERISA compliance, **(2)** `;
+  summary += `**RECOMMENDATIONS**: Based on this benchmarking analysis, plan fiduciaries should take the following actions:\n\n`;
 
-  if (highestPercentile > 0.2) {
-    summary += `Consider conducting a competitive RFP process or fee negotiation specifically targeting the ${areaNames[highestCostArea]} to optimize plan costs, **(3)** `;
-  } else {
-    summary += `Continue annual fee benchmarking to ensure ongoing competitiveness, **(3)** `;
+  let recNumber = 1;
+
+  // Priority 1: Missing essential services (if any)
+  if (totalMissingEssential > 0) {
+    summary += `**(${recNumber})** **ADDRESS SERVICE GAPS**: Immediately work with current providers to add the ${totalMissingEssential} missing essential service${totalMissingEssential > 1 ? 's' : ''} `;
+    if (missingAdvisor.length > 0) summary += `(Advisor: ${missingAdvisor.join(', ')}) `;
+    if (missingRecordkeeper.length > 0) summary += `(Recordkeeper: ${missingRecordkeeper.join(', ')}) `;
+    if (missingTPA.length > 0) summary += `(TPA: ${missingTPA.join(', ')}) `;
+    summary += `to ensure compliance with fiduciary responsibilities and operational effectiveness. `;
+    recNumber++;
   }
 
-  if (proposedCalculatedFees && (calculatedFees.total.dollarAmount - proposedCalculatedFees.total.dollarAmount) > 0) {
-    summary += `Proceed with implementation of the proposed fee structure after confirming service level agreements and transition timelines with proposed vendors.`;
-  } else {
-    summary += `Review participant communication materials to ensure transparency around plan fees and investment costs.`;
+  // Priority 2: Proposed plan decision or optimization opportunity
+  if (proposedCalculatedFees && proposedPlanData && proposedServiceAnalysis) {
+    const savings = calculatedFees.total.dollarAmount - proposedCalculatedFees.total.dollarAmount;
+    const proposedTotalMissing = proposedMissingAdvisor.length + proposedMissingRecordkeeper.length + proposedMissingTPA.length;
+    const scoreDelta = proposedServiceAnalysis.score - serviceAnalysis.score;
+
+    if (savings > 0 && proposedTotalMissing <= totalMissingEssential && scoreDelta >= -10) {
+      // Recommend proceeding with proposed plan
+      summary += `**(${recNumber})** **IMPLEMENT PROPOSED PLAN**: Proceed with the proposed fee structure to capture **${formatCurrency(savings)} in annual savings** while ${proposedTotalMissing < totalMissingEssential ? 'improving service coverage' : 'maintaining adequate service levels'}. Confirm service level agreements and establish clear transition timelines with proposed vendors before finalizing. `;
+    } else if (savings > 0 && proposedTotalMissing > totalMissingEssential) {
+      // Caution against proposed plan due to service gaps
+      summary += `**(${recNumber})** **RE-EVALUATE PROPOSED PLAN**: While the proposed plan offers **${formatCurrency(savings)} in savings**, the ${proposedTotalMissing - totalMissingEssential} additional missing essential service${(proposedTotalMissing - totalMissingEssential) > 1 ? 's' : ''} creates compliance risks. Work with proposed vendors to include these essential services before proceeding. `;
+    } else if (savings < 0 && scoreDelta > 15) {
+      // Fee increase justified by significant service improvement
+      summary += `**(${recNumber})** **CONSIDER ENHANCED SERVICES**: The proposed plan's **${formatCurrency(Math.abs(savings))} fee increase** is accompanied by a ${scoreDelta}-point service improvement. Evaluate whether these enhanced capabilities align with plan objectives and participant needs. `;
+    } else {
+      // Fee increase not well justified
+      summary += `**(${recNumber})** **CONTINUE CURRENT STRUCTURE**: The proposed plan does not demonstrate sufficient value improvement to justify implementation. Continue with the current structure while addressing any service gaps. `;
+    }
+    recNumber++;
+  } else if (highestPercentile > 0.2) {
+    // No proposed plan but opportunity exists
+    const highestCostArea = feeTypes.reduce((highest, type) => {
+      const fee = calculatedFees[type].percentage;
+      const benchmark = benchmarks[type];
+      const percentileScore = (fee - benchmark.p50) / benchmark.p50;
+      const currentHighest = (calculatedFees[highest].percentage - benchmarks[highest].p50) / benchmarks[highest].p50;
+      return percentileScore > currentHighest ? type : highest;
+    }, 'advisor' as const);
+
+    const potentialSavings = calculatedFees[highestCostArea].dollarAmount * 0.15;
+    summary += `**(${recNumber})** **CONDUCT TARGETED RFP**: The **${areaNames[highestCostArea]}** represents the primary optimization opportunity. Conduct a competitive RFP process to potentially generate **${formatCurrency(potentialSavings)} in annual savings** while maintaining or improving current service levels. `;
+    recNumber++;
   }
+
+  // Always include documentation recommendation
+  summary += `**(${recNumber})** **DOCUMENT FIDUCIARY OVERSIGHT**: Maintain this fee benchmarking analysis in plan records as evidence of ongoing prudent oversight and compliance with ERISA fiduciary standards. Conduct annual benchmarking reviews to ensure continued fee competitiveness and service adequacy.`;
 
   return summary;
 }
