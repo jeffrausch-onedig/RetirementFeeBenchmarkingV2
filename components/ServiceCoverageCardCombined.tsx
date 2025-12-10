@@ -260,7 +260,6 @@ export default function ServiceCoverageCardCombined({
             )}
           </div>
         </div>
-      </div>
 
       {/* Insights/Warnings */}
       {allInsights.length > 0 && (

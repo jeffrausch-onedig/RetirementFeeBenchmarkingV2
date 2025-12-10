@@ -344,7 +344,12 @@ export function calculateServiceValueScore(
       standard: 2.5,   // Standard very important
       premium: 2       // Premium expected for large plans
     }
-  }[planSize];
+  }[planSize] || {
+    // Default to mid-market if planSize is somehow invalid
+    essential: 3,
+    standard: 2,
+    premium: 1
+  };
 
   // Weight essential services heavily, with plan size adjustments
   const calculateWeightedScore = (coverage: ReturnType<typeof calculateServiceCoverage>): number => {

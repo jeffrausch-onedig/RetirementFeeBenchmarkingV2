@@ -194,7 +194,7 @@ export function generateSamplePlanData(): {
       tpa: {
         type: 'flatPlusPerHead',
         flatFee: tpaFlat,
-        perParticipantFee: tpaPerHead,
+        perHeadFee: tpaPerHead,
       },
       investmentMenu: {
         type: 'basisPoints',
@@ -239,7 +239,7 @@ export function generateSamplePlanData(): {
       tpa: {
         type: 'flatPlusPerHead',
         flatFee: proposedTpaFlat,
-        perParticipantFee: proposedTpaPerHead,
+        perHeadFee: proposedTpaPerHead,
       },
       investmentMenu: {
         type: 'basisPoints',
@@ -271,7 +271,7 @@ export const sampleScenarios = {
         fees: {
           advisor: { type: 'basisPoints', basisPoints: 50 }, // At 50th percentile for $1-3m
           recordKeeper: { type: 'flatFee', flatFee: 12_000 },
-          tpa: { type: 'flatPlusPerHead', flatFee: 2_500, perParticipantFee: 50 },
+          tpa: { type: 'flatPlusPerHead', flatFee: 2_500, perHeadFee: 50 },
           investmentMenu: { type: 'basisPoints', basisPoints: 25 },
         },
         services: {
@@ -302,7 +302,7 @@ export const sampleScenarios = {
         fees: {
           advisor: { type: 'basisPoints', basisPoints: 40 }, // Reduced to 25th percentile
           recordKeeper: { type: 'flatFee', flatFee: 10_000 },
-          tpa: { type: 'flatPlusPerHead', flatFee: 2_000, perParticipantFee: 45 },
+          tpa: { type: 'flatPlusPerHead', flatFee: 2_000, perHeadFee: 45 },
           investmentMenu: { type: 'basisPoints', basisPoints: 20 },
         },
         services: {
@@ -345,7 +345,7 @@ export const sampleScenarios = {
         fees: {
           advisor: { type: 'basisPoints', basisPoints: 7 }, // Within benchmark range for $50-100m
           recordKeeper: { type: 'basisPoints', basisPoints: 20 },
-          tpa: { type: 'flatPlusPerHead', flatFee: 4_000, perParticipantFee: 30 },
+          tpa: { type: 'flatPlusPerHead', flatFee: 4_000, perHeadFee: 30 },
           investmentMenu: { type: 'basisPoints', basisPoints: 18 },
         },
         services: {
@@ -394,7 +394,7 @@ export const sampleScenarios = {
         fees: {
           advisor: { type: 'basisPoints', basisPoints: 5 }, // Below median - competitive
           recordKeeper: { type: 'basisPoints', basisPoints: 18 },
-          tpa: { type: 'flatPlusPerHead', flatFee: 3_500, perParticipantFee: 25 },
+          tpa: { type: 'flatPlusPerHead', flatFee: 3_500, perHeadFee: 25 },
           investmentMenu: { type: 'basisPoints', basisPoints: 15 },
         },
         services: {
