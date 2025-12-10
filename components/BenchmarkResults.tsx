@@ -18,9 +18,11 @@ import type { AISummaryRequest } from "@/lib/types";
 
 interface BenchmarkResultsProps {
   data: ComparisonData;
+  showSummaryButton?: boolean;
+  showExportButton?: boolean;
 }
 
-export function BenchmarkResults({ data }: BenchmarkResultsProps) {
+export function BenchmarkResults({ data, showSummaryButton = true, showExportButton = true }: BenchmarkResultsProps) {
   const [benchmarks, setBenchmarks] = useState<BenchmarkComparison | null>(null);
   const [existingFees, setExistingFees] = useState<CalculatedFees | null>(null);
   const [proposedFees, setProposedFees] = useState<CalculatedFees | null>(null);
@@ -104,6 +106,12 @@ export function BenchmarkResults({ data }: BenchmarkResultsProps) {
     setShowSummary(true);
   };
 
+  // Handle regenerate summary
+  const handleRegenerateSummary = () => {
+    setAiSummary(undefined); // Clear existing summary to trigger regeneration
+    setShowSummary(true);
+  };
+
   // Handle PowerPoint export
   const handleExport = async () => {
     try {
@@ -162,17 +170,31 @@ export function BenchmarkResults({ data }: BenchmarkResultsProps) {
       )}
 
       {/* Export Button and Generate Summary Button */}
-      <div className="flex justify-between items-center">
-        {!showSummary && (
-          <Button onClick={() => setShowSummary(true)} variant="outline">
-            Generate AI Summary
-          </Button>
-        )}
-        {showSummary && <div></div>}
-        <Button onClick={handleExport} variant="default">
-          Export to PowerPoint
-        </Button>
-      </div>
+      {(showSummaryButton || showExportButton) && (
+        <div className="flex justify-between items-center">
+          {showSummaryButton && (
+            <>
+              {!showSummary && (
+                <Button onClick={() => setShowSummary(true)} variant="outline">
+                  Generate AI Summary
+                </Button>
+              )}
+              {showSummary && aiSummary && (
+                <Button onClick={handleRegenerateSummary} variant="outline">
+                  Regenerate AI Summary
+                </Button>
+              )}
+              {showSummary && !aiSummary && <div></div>}
+            </>
+          )}
+          {!showSummaryButton && <div></div>}
+          {showExportButton && (
+            <Button onClick={handleExport} variant="default">
+              Export to PowerPoint
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* AI Executive Summary - Only show after user clicks generate */}
       {showSummary && (

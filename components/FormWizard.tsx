@@ -47,6 +47,7 @@ export function FormWizard() {
   const [proposedPlan, setProposedPlan] = useState<PlanData>({ ...emptyPlanData });
   const [includeProposed, setIncludeProposed] = useState(false);
   const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
+  const [isSavedView, setIsSavedView] = useState(false);
 
   // Scroll to top when step changes
   useEffect(() => {
@@ -81,13 +82,49 @@ export function FormWizard() {
     setCurrentStep(4);
   };
 
+  const handleSaveReport = () => {
+    setIsSavedView(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleStartOver = () => {
     setCurrentStep(1);
     setExistingPlan({ ...emptyPlanData });
     setProposedPlan({ ...emptyPlanData });
     setIncludeProposed(false);
     setComparisonData(null);
+    setIsSavedView(false);
   };
+
+  // If in saved view, show only the report without wizard steps
+  if (isSavedView && comparisonData) {
+    return (
+      <div className="space-y-6">
+        <BenchmarkResults
+          data={comparisonData}
+          showSummaryButton={true}
+          showExportButton={true}
+        />
+        <div className="flex justify-center gap-4">
+          <button
+            onClick={() => {
+              setIsSavedView(false);
+              setCurrentStep(1);
+            }}
+            className="px-6 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md"
+          >
+            Edit Report
+          </button>
+          <button
+            onClick={handleStartOver}
+            className="px-6 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
+          >
+            Create New Report
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -168,7 +205,11 @@ export function FormWizard() {
 
         {currentStep === 4 && comparisonData && (
           <div className="space-y-6">
-            <BenchmarkResults data={comparisonData} />
+            <BenchmarkResults
+              data={comparisonData}
+              showSummaryButton={true}
+              showExportButton={true}
+            />
             <div className="flex justify-between items-center">
               <button
                 onClick={() => setCurrentStep(1)}
@@ -177,7 +218,7 @@ export function FormWizard() {
                 Edit Inputs
               </button>
               <button
-                onClick={handleStartOver}
+                onClick={handleSaveReport}
                 className="px-6 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
               >
                 Save Report
