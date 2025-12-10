@@ -48,6 +48,8 @@ export function FormWizard() {
   const [includeProposed, setIncludeProposed] = useState(false);
   const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
   const [isSavedView, setIsSavedView] = useState(false);
+  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+  const [hasSavedReport, setHasSavedReport] = useState(false);
 
   // Scroll to top when step changes
   useEffect(() => {
@@ -83,7 +85,18 @@ export function FormWizard() {
   };
 
   const handleSaveReport = () => {
+    // If there's already a saved report, show confirmation modal
+    if (hasSavedReport) {
+      setShowSaveConfirmation(true);
+    } else {
+      confirmSaveReport();
+    }
+  };
+
+  const confirmSaveReport = () => {
     setIsSavedView(true);
+    setHasSavedReport(true);
+    setShowSaveConfirmation(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -94,6 +107,7 @@ export function FormWizard() {
     setIncludeProposed(false);
     setComparisonData(null);
     setIsSavedView(false);
+    setHasSavedReport(false);
   };
 
   // If in saved view, show only the report without wizard steps
@@ -136,6 +150,43 @@ export function FormWizard() {
 
   return (
     <div className="space-y-6">
+      {/* Save Confirmation Modal */}
+      {showSaveConfirmation && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <svg className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <h3 className="font-semibold text-lg">Replace Existing Report?</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Saving this report will replace the previously saved report. This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    onClick={() => setShowSaveConfirmation(false)}
+                    className="px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmSaveReport}
+                    className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
+                  >
+                    Replace Report
+                  </button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Progress Indicator */}
       <Card>
         <CardContent className="pt-6">
