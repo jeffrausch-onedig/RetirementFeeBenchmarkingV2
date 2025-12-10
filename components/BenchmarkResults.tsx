@@ -107,12 +107,6 @@ export function BenchmarkResults({ data, showSummaryButton = true, showExportBut
     setShowSummary(true);
   };
 
-  // Handle regenerate summary
-  const handleRegenerateSummary = () => {
-    setAiSummary(undefined); // Clear existing summary to trigger regeneration
-    setShowSummary(true);
-  };
-
   // Handle PowerPoint export
   const handleExport = async () => {
     try {
@@ -173,19 +167,12 @@ export function BenchmarkResults({ data, showSummaryButton = true, showExportBut
       {/* Export Button and Generate Summary Button */}
       {renderTopButtons ? (
         renderTopButtons(
-          // Summary Button
-          <>
-            {!showSummary && (
-              <Button onClick={() => setShowSummary(true)} variant="outline">
-                Generate AI Summary
-              </Button>
-            )}
-            {showSummary && aiSummary && (
-              <Button onClick={handleRegenerateSummary} variant="outline">
-                Regenerate AI Summary
-              </Button>
-            )}
-          </>,
+          // Summary Button (only show if no summary generated yet)
+          !aiSummary && !showSummary ? (
+            <Button onClick={() => setShowSummary(true)} variant="outline">
+              Generate AI Summary
+            </Button>
+          ) : null,
           // Export Button
           <Button onClick={handleExport} variant="default">
             Export to PowerPoint
@@ -199,11 +186,6 @@ export function BenchmarkResults({ data, showSummaryButton = true, showExportBut
                 {!showSummary && (
                   <Button onClick={() => setShowSummary(true)} variant="outline">
                     Generate AI Summary
-                  </Button>
-                )}
-                {showSummary && aiSummary && (
-                  <Button onClick={handleRegenerateSummary} variant="outline">
-                    Regenerate AI Summary
                   </Button>
                 )}
                 {showSummary && !aiSummary && <div></div>}
