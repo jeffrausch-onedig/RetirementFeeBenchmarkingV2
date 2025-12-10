@@ -3,6 +3,7 @@ import Papa from 'papaparse';
 
 // Cache for benchmark data
 let benchmarkCache: BenchmarkData[] | null = null;
+let dataSource: 'domo' | 'csv' | null = null;
 
 /**
  * Load benchmark data from local CSV file (fallback)
@@ -131,17 +132,26 @@ export async function loadBenchmarkData(): Promise<BenchmarkData[]> {
   try {
     console.log('Attempting to load benchmark data from Domo API...');
     benchmarkCache = await loadFromDomoAPI();
+    dataSource = 'domo';
     return benchmarkCache;
   } catch (domoError) {
     console.warn('Domo API failed, falling back to local CSV file:', domoError);
     try {
       benchmarkCache = await loadFromCSV();
+      dataSource = 'csv';
       return benchmarkCache;
     } catch (csvError) {
       console.error('Both Domo API and CSV fallback failed:', csvError);
       throw new Error('Unable to load benchmark data from either Domo API or local CSV file');
     }
   }
+}
+
+/**
+ * Get the current data source being used
+ */
+export function getDataSource(): 'domo' | 'csv' | null {
+  return dataSource;
 }
 
 /**
@@ -246,6 +256,7 @@ export async function getBenchmarkComparison(
     tpa: tpa || { p25: 0, p50: 0, p75: 0 },
     investmentMenu: investmentMenu || { p25: 0, p50: 0, p75: 0 },
     total: total || { p25: 0, p50: 0, p75: 0 },
+    dataSource: dataSource || undefined,
   };
 }
 

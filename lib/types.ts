@@ -167,6 +167,7 @@ export interface BenchmarkComparison {
   tpa: BenchmarkPercentiles;
   investmentMenu: BenchmarkPercentiles;
   total: BenchmarkPercentiles;
+  dataSource?: 'domo' | 'csv';
 }
 
 // AI Summary types
