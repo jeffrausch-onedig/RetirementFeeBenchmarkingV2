@@ -1,0 +1,32 @@
+Provider Category,Service Name,Service Code,Tier,Description
+Advisor,Plan Design Consulting,planDesignConsulting,Standard,Strategic plan design recommendations and optimization
+Advisor,Investment Menu Selection,investmentMenuSelection,Essential,Core fiduciary service for selecting and monitoring investment options
+Advisor,Participant Education,participantEducation,Standard,Financial wellness and retirement education programs for participants
+Advisor,Fiduciary Support 3(21),fiduciarySupport321,Essential,Limited fiduciary services (investment advice)
+Advisor,Fiduciary Support 3(38),fiduciarySupport338,Premium,Full fiduciary services (investment management)
+Advisor,Compliance Assistance,complianceAssistance,Essential,Ongoing regulatory compliance guidance and support
+Advisor,Quarterly Reviews,quarterlyReviews,Standard,Regular performance reviews and plan health assessments
+Advisor,Custom Reporting,customReporting,Premium,Tailored reporting and analytics for plan sponsors
+Recordkeeper,Participant Website,participantWebsite,Essential,Online portal for participant account access and management
+Recordkeeper,Mobile App,mobileApp,Standard,Mobile application for on-the-go account access
+Recordkeeper,Call Center Support,callCenterSupport,Essential,Telephone support line for participant inquiries
+Recordkeeper,Online Enrollment,onlineEnrollment,Essential,Digital enrollment and beneficiary designation
+Recordkeeper,Loan Administration,loanAdministration,Standard,Participant loan processing and management
+Recordkeeper,Distribution Processing,distributionProcessing,Premium,Withdrawal and distribution request processing
+Recordkeeper,Payroll Integration,payrollIntegration,Premium,Automated payroll deduction integration
+Recordkeeper,Daily Valuation,dailyValuation,Standard,Daily participant account balance updates
+Recordkeeper,Auto Enrollment,autoEnrollment,Premium,Automatic enrollment features for new eligible employees
+Recordkeeper,Participant Statements,participantStatements,Standard,Periodic account statements and confirmations
+TPA,Form 5500 Preparation,form5500Preparation,Essential,Annual Form 5500 preparation and filing
+TPA,Discrimination Testing,discriminationTesting,Essential,ADP/ACP and other nondiscrimination testing
+TPA,Plan Document Updates,planDocumentUpdates,Standard,Plan document amendments for regulatory changes
+TPA,Amendment Services,amendmentServices,Premium,Custom plan amendment drafting and execution
+TPA,Notice Preparation,noticePrparation,Premium,Required participant notice preparation and distribution
+TPA,Compliance Testing,complianceTesting,Essential,Required annual compliance testing and reporting
+TPA,Government Filings,governmentFilings,Standard,IRS and DOL filing submissions and tracking
+TPA,Participant Notices,participantNotices,Standard,Distribution of required regulatory notices to participants
+Audit,Full Scope Audit,fullScopeAudit,Standard,Complete audit of plan financial statements and operations
+Audit,Limited Scope Audit,limitedScopeAudit,Standard,ERISA Section 103(a)(3)(C) limited scope audit
+Audit,Annual Audit,annualAudit,Essential,Required annual independent audit (plans with 100+ participants)
+Audit,Biannual Audit,biannualAudit,Premium,Audit conducted every two years (if eligible)
+Audit,Triannual Audit,triannualAudit,Premium,Audit conducted every three years (if eligible)

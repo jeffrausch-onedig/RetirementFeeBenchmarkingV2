@@ -135,24 +135,37 @@ export function generateSamplePlanData(): {
     },
   };
 
-  // Generate realistic fee structures
-  // Advisor: typically 50-100 basis points for mid-market plans
-  const advisorBps = Math.floor(Math.random() * 50) + 50;
+  // Generate realistic fee structures aligned with benchmark data
+  // Advisor fees: scale based on plan size to match benchmarks (typically 50th-75th percentile)
+  let advisorBps: number;
+  if (aum < 5_000_000) {
+    // Small plans: 40-75 bps (benchmarks show 50-75 for < $5M)
+    advisorBps = Math.floor(Math.random() * 35) + 40;
+  } else if (aum < 20_000_000) {
+    // Mid-small plans: 25-40 bps (benchmarks show 25-50 for $5-20M)
+    advisorBps = Math.floor(Math.random() * 15) + 25;
+  } else if (aum < 50_000_000) {
+    // Mid-large plans: 14-27 bps (benchmarks show 14-25 for $20-50M)
+    advisorBps = Math.floor(Math.random() * 13) + 14;
+  } else {
+    // Large plans: 5-10 bps (benchmarks show 3-7 for $50M+)
+    advisorBps = Math.floor(Math.random() * 5) + 5;
+  }
 
-  // Recordkeeper: varies by plan size, typically 25-75 bps or flat fee
+  // Recordkeeper: varies by plan size, bps for large plans or flat for smaller
   const recordkeeperBps = aum > 10_000_000
-    ? Math.floor(Math.random() * 30) + 25
+    ? Math.floor(Math.random() * 15) + 15 // 15-30 bps for large plans
     : 0;
   const recordkeeperFlat = aum <= 10_000_000
-    ? Math.floor(Math.random() * 15_000) + 10_000
+    ? Math.floor(Math.random() * 10_000) + 8_000 // $8k-$18k for smaller plans
     : 0;
 
-  // TPA: usually flat + per participant
-  const tpaFlat = Math.floor(Math.random() * 3_000) + 2_000;
-  const tpaPerHead = Math.floor(Math.random() * 30) + 40;
+  // TPA: flat + per participant (keeping reasonable ranges)
+  const tpaFlat = Math.floor(Math.random() * 2_000) + 2_000; // $2k-$4k base
+  const tpaPerHead = Math.floor(Math.random() * 20) + 30; // $30-$50 per participant
 
-  // Investment menu: 15-35 basis points
-  const investmentMenuBps = Math.floor(Math.random() * 20) + 15;
+  // Investment menu: 15-30 basis points (slightly reduced upper range)
+  const investmentMenuBps = Math.floor(Math.random() * 15) + 15;
 
   // Calculate benchmark categories based on AUM and average balance
   const benchmarkCategory = getAUMBenchmarkCategory(aum);
@@ -256,10 +269,10 @@ export const sampleScenarios = {
         balanceBenchmarkCategory: getBalanceBenchmarkCategory(avgBalance), // $50-75k
         feeType: 'unbundled',
         fees: {
-          advisor: { type: 'basisPoints', basisPoints: 100 },
-          recordKeeper: { type: 'flatFee', flatFee: 15_000 },
-          tpa: { type: 'flatPlusPerHead', flatFee: 3_000, perParticipantFee: 75 },
-          investmentMenu: { type: 'basisPoints', basisPoints: 30 },
+          advisor: { type: 'basisPoints', basisPoints: 50 }, // At 50th percentile for $1-3m
+          recordKeeper: { type: 'flatFee', flatFee: 12_000 },
+          tpa: { type: 'flatPlusPerHead', flatFee: 2_500, perParticipantFee: 50 },
+          investmentMenu: { type: 'basisPoints', basisPoints: 25 },
         },
         services: {
           advisor: {
@@ -287,10 +300,10 @@ export const sampleScenarios = {
         balanceBenchmarkCategory: getBalanceBenchmarkCategory(avgBalance), // $50-75k
         feeType: 'unbundled',
         fees: {
-          advisor: { type: 'basisPoints', basisPoints: 85 },
-          recordKeeper: { type: 'flatFee', flatFee: 12_000 },
-          tpa: { type: 'flatPlusPerHead', flatFee: 2_500, perParticipantFee: 65 },
-          investmentMenu: { type: 'basisPoints', basisPoints: 25 },
+          advisor: { type: 'basisPoints', basisPoints: 40 }, // Reduced to 25th percentile
+          recordKeeper: { type: 'flatFee', flatFee: 10_000 },
+          tpa: { type: 'flatPlusPerHead', flatFee: 2_000, perParticipantFee: 45 },
+          investmentMenu: { type: 'basisPoints', basisPoints: 20 },
         },
         services: {
           advisor: {
@@ -330,9 +343,9 @@ export const sampleScenarios = {
         balanceBenchmarkCategory: getBalanceBenchmarkCategory(avgBalance), // $75-100k
         feeType: 'unbundled',
         fees: {
-          advisor: { type: 'basisPoints', basisPoints: 40 },
-          recordKeeper: { type: 'basisPoints', basisPoints: 30 },
-          tpa: { type: 'flatPlusPerHead', flatFee: 5_000, perParticipantFee: 35 },
+          advisor: { type: 'basisPoints', basisPoints: 7 }, // Within benchmark range for $50-100m
+          recordKeeper: { type: 'basisPoints', basisPoints: 20 },
+          tpa: { type: 'flatPlusPerHead', flatFee: 4_000, perParticipantFee: 30 },
           investmentMenu: { type: 'basisPoints', basisPoints: 18 },
         },
         services: {
@@ -379,9 +392,9 @@ export const sampleScenarios = {
         balanceBenchmarkCategory: getBalanceBenchmarkCategory(avgBalance), // $75-100k
         feeType: 'unbundled',
         fees: {
-          advisor: { type: 'basisPoints', basisPoints: 35 },
-          recordKeeper: { type: 'basisPoints', basisPoints: 25 },
-          tpa: { type: 'flatPlusPerHead', flatFee: 4_500, perParticipantFee: 30 },
+          advisor: { type: 'basisPoints', basisPoints: 5 }, // Below median - competitive
+          recordKeeper: { type: 'basisPoints', basisPoints: 18 },
+          tpa: { type: 'flatPlusPerHead', flatFee: 3_500, perParticipantFee: 25 },
           investmentMenu: { type: 'basisPoints', basisPoints: 15 },
         },
         services: {

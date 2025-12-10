@@ -1,13 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { FeeInputForm } from "@/components/FeeInputForm";
-import { ComparisonData } from "@/lib/types";
-import { BenchmarkResults } from "@/components/BenchmarkResults";
+import { FormWizard } from "@/components/FormWizard";
 
 export default function Home() {
-  const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
-
   return (
     <main className="min-h-screen p-8 bg-background">
       <div className="max-w-7xl mx-auto">
@@ -20,13 +15,7 @@ export default function Home() {
           </p>
         </header>
 
-        <div className="grid gap-8">
-          <FeeInputForm onSubmit={setComparisonData} />
-
-          {comparisonData && (
-            <BenchmarkResults data={comparisonData} />
-          )}
-        </div>
+        <FormWizard />
       </div>
     </main>
   );

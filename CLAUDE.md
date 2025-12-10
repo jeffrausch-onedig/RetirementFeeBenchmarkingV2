@@ -101,6 +101,100 @@ All types are defined in `lib/types.ts`. Key interfaces:
 
 All charts use Recharts with custom theming via CSS variables defined in `globals.css`.
 
+## Service Baseline Framework
+
+The application includes a comprehensive service baseline system that evaluates plan service coverage and calculates Service Value Scores.
+
+### Service Tier System
+
+Services are categorized into three tiers based on industry standards (DOL ERISA 408(b)(2), NAPA, PLANSPONSOR):
+
+- **Essential**: Core services required for basic plan operation and fiduciary compliance
+- **Standard**: Services expected by most plans in the market segment
+- **Premium**: Enhanced services that provide additional value
+
+### Plan Size-Adjusted Scoring
+
+**Critical Implementation Detail**: Service Value Scores (0-100) use plan size-adjusted weighting to reflect different expectations for plans of different sizes.
+
+**Tier Weights by Plan Size** (`lib/serviceBaselines.ts` lines 310-347):
+
+**Small Plans (< $5M AUM)**:
+- Essential: 5x weight (heavily emphasized)
+- Standard: 1.5x weight (less important)
+- Premium: 0.5x weight (nearly irrelevant)
+- **Philosophy**: Small plans should focus on cost-effective essential services
+
+**Mid-Market Plans ($5M-$50M AUM)**:
+- Essential: 3x weight (still most important)
+- Standard: 2x weight (expected)
+- Premium: 1x weight (nice to have)
+- **Philosophy**: Expected to have comprehensive essential and standard coverage
+
+**Large Plans (> $50M AUM)**:
+- Essential: 3x weight (always critical)
+- Standard: 2.5x weight (very important)
+- Premium: 2x weight (expected for large plans)
+- **Philosophy**: Should have comprehensive service packages including premium features
+
+### Score Calculation Example
+
+A plan with **all 3 essential advisor services** but **no standard or premium services**:
+
+- **Small Plan (< $5M AUM)**: Scores ~71% (excellent - covering what matters most)
+- **Mid-Market Plan ($5M-$50M AUM)**: Scores ~50% (adequate but missing expected standard services)
+- **Large Plan (> $50M AUM)**: Scores ~40% (concerning - large plans need comprehensive coverage)
+
+### Service Coverage Components
+
+**Provider-Specific Baselines** (`lib/serviceBaselines.ts`):
+- `advisorServiceBaseline`: Advisory services (8 services across 3 tiers)
+- `recordkeeperServiceBaseline`: Recordkeeping services (10 services)
+- `tpaServiceBaseline`: TPA/compliance services (8 services)
+- `auditServiceBaseline`: Audit services (5 services)
+
+**Key Functions**:
+- `calculateServiceValueScore()`: Main scoring function with plan size adjustment
+- `calculateServiceCoverage()`: Counts services by tier and calculates percentages
+- `getMissingEssentialServices()`: Identifies compliance gaps
+- `getPlanSizeCategory()`: Categorizes plans into size buckets
+
+### Plan Size Expectations
+
+Minimum service counts by plan size (`lib/serviceBaselines.ts` lines 136-158):
+
+| Plan Size | Min Advisor | Min Recordkeeper | Min TPA | Recommended Tiers |
+|-----------|-------------|------------------|---------|-------------------|
+| Small Plan (< $5M AUM) | 3 | 5 | 3 | Essential only |
+| Mid-Market Plan ($5M-$50M AUM) | 5 | 6 | 5 | Essential + Standard |
+| Large Plan (> $50M AUM) | 6 | 8 | 6 | Essential + Standard + Premium |
+
+**Important**: These minimums generate warnings but don't directly affect the score calculation. The score is calculated using the tier weights shown above.
+
+### UI Components
+
+**Service Analysis Displays**:
+- `ServiceRadarChart.tsx`: 5-axis radar showing service scores + fee competitiveness
+- `ServiceCoverageCard.tsx`: Individual plan coverage breakdown by provider
+- `ServiceComparison.tsx`: Service-by-service comparison with tier badges
+- `ServiceSelectionTable.tsx`: Interactive service selection with tier grouping
+
+**Tier Badge System**:
+- Essential: Red badge with "E"
+- Standard: Blue badge with "S"
+- Premium: Purple badge with "P"
+
+### Integration with Fee Analysis
+
+The Service Value Score is integrated into the overall benchmarking analysis to evaluate whether fees are justified by service levels:
+
+- **High fees + High service score**: Fees justified by comprehensive services
+- **Low fees + Low service score**: Cost savings but potential service gaps
+- **High fees + Low service score**: Major concern requiring immediate attention
+- **Low fees + High service score**: Excellent value proposition
+
+The AI Executive Summary (`lib/aiSummary.ts`) automatically factors in service coverage when evaluating fee competitiveness.
+
 ## Extending the Application
 
 ### Adding a New Fee Type

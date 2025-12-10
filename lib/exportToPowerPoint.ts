@@ -1,5 +1,6 @@
 import pptxgen from "pptxgenjs";
-import { BenchmarkComparison, CalculatedFees, PlanFeeType } from "./types";
+import { BenchmarkComparison, CalculatedFees, PlanFeeType, ServiceOptions } from "./types";
+import { calculateServiceValueScore, calculateServiceCoverage, advisorServiceBaseline, recordkeeperServiceBaseline, tpaServiceBaseline, auditServiceBaseline } from "./serviceBaselines";
 
 interface ExportOptions {
   benchmarks: BenchmarkComparison;
@@ -11,13 +12,15 @@ interface ExportOptions {
   viewMode: "basisPoints" | "dollars" | "percentage";
   feeType?: PlanFeeType;
   aiSummary?: string;
+  existingServices?: ServiceOptions;
+  proposedServices?: ServiceOptions;
 }
 
 /**
  * Export benchmark charts to PowerPoint
  */
 export async function exportToPowerPoint(options: ExportOptions): Promise<void> {
-  const { benchmarks, existingFees, proposedFees, aum, viewMode, aiSummary } = options;
+  const { benchmarks, existingFees, proposedFees, aum, viewMode, aiSummary, existingServices, proposedServices } = options;
 
   const pptx = new pptxgen();
 
@@ -38,7 +41,7 @@ export async function exportToPowerPoint(options: ExportOptions): Promise<void> 
       x: 0.5,
       y: 0.3,
       w: 9,
-      h: 0.5,
+      h: 0,
       fontSize: 32,
       bold: true,
       color: "003B5C",
@@ -102,7 +105,7 @@ export async function exportToPowerPoint(options: ExportOptions): Promise<void> 
   const benchmarkSlide = pptx.addSlide();
 
   benchmarkSlide.addText("Fee Benchmark Comparison", {
-    x: 0.5, y: 0.3, w: 9, h: 0.5,
+    x: 0.5, y: 0.3, w: 9, h: 0,
     fontSize: 24,
     bold: true,
     color: "003B5C",
@@ -173,6 +176,7 @@ export async function exportToPowerPoint(options: ExportOptions): Promise<void> 
     slide.addText(title, {
       x: 0.5,
       y: 0.3,
+      h: 0,
       fontSize: 24,
       bold: true,
       color: "003B5C",
@@ -232,6 +236,214 @@ export async function exportToPowerPoint(options: ExportOptions): Promise<void> 
   addItemizedSlide("Investment Menu Fee", benchmarks.investmentMenu, existingFees.investmentMenu.percentage, proposedFees?.investmentMenu.percentage);
   addItemizedSlide("TPA Fee", benchmarks.tpa, existingFees.tpa.percentage, proposedFees?.tpa.percentage);
   addItemizedSlide("Total Plan Fee", benchmarks.total, existingFees.total.percentage, proposedFees?.total.percentage);
+
+  // Service Analysis Slides (if service data is provided)
+  if (existingServices) {
+    // Calculate service scores
+    const existingScore = calculateServiceValueScore(existingServices, aum);
+    const proposedScore = proposedServices ? calculateServiceValueScore(proposedServices, aum) : null;
+
+    // Calculate fee competitiveness scores
+    const calculateFeePercentileScore = (
+      feePercentage: number,
+      benchmarkPercentiles: { p25: number; p50: number; p75: number }
+    ): number => {
+      const feeDecimal = feePercentage / 100;
+      const { p25, p50, p75 } = benchmarkPercentiles;
+      const p100 = p75 + (p75 - p50);
+
+      let score: number;
+      if (feeDecimal <= p25) {
+        score = 100;
+      } else if (feeDecimal >= p100) {
+        score = 0;
+      } else if (feeDecimal >= p75) {
+        score = 25 * (1 - (feeDecimal - p75) / (p100 - p75));
+      } else if (feeDecimal >= p50) {
+        score = 25 + 25 * (1 - (feeDecimal - p50) / (p75 - p50));
+      } else {
+        score = 50 + 50 * (1 - (feeDecimal - p25) / (p50 - p25));
+      }
+      return Math.min(100, Math.max(0, score));
+    };
+
+    const existingFeeScore = calculateFeePercentileScore(existingFees.total.percentage, benchmarks.total);
+    const proposedFeeScore = proposedFees ? calculateFeePercentileScore(proposedFees.total.percentage, benchmarks.total) : null;
+
+    // Slide: Service & Fee Competitiveness Analysis
+    const serviceRadarSlide = pptx.addSlide();
+
+    serviceRadarSlide.addText("Service & Fee Competitiveness Analysis", {
+      x: 0.5,
+      y: 0.3,
+      w: 9,
+      h: 0,
+      fontSize: 24,
+      bold: true,
+      color: "003B5C",
+    });
+
+    // Radar chart data
+    const radarCategories = ["Advisor\nServices", "Recordkeeper\nServices", "TPA\nServices", "Audit\nServices", "Total Fee\nCompetitiveness"];
+    const existingRadarValues = [
+      existingScore.breakdown.advisor,
+      existingScore.breakdown.recordKeeper,
+      existingScore.breakdown.tpa,
+      existingScore.breakdown.audit,
+      existingFeeScore
+    ];
+
+    const radarChartData = [
+      {
+        name: "Current Plan",
+        labels: radarCategories,
+        values: existingRadarValues
+      }
+    ];
+
+    if (proposedScore && proposedFeeScore !== null) {
+      const proposedRadarValues = [
+        proposedScore.breakdown.advisor,
+        proposedScore.breakdown.recordKeeper,
+        proposedScore.breakdown.tpa,
+        proposedScore.breakdown.audit,
+        proposedFeeScore
+      ];
+      radarChartData.push({
+        name: "Proposed Plan",
+        labels: radarCategories,
+        values: proposedRadarValues
+      });
+    }
+
+    serviceRadarSlide.addChart(pptx.ChartType.radar, radarChartData, {
+      x: 1.25,
+      y: 0.81,
+      w: 7.5,
+      h: 3.8,
+      chartColors: ["0078A2", "8EB935"],
+      showLegend: true,
+      legendPos: "b",
+      radarStyle: "filled",
+      showTitle: false,
+      catAxisLabelFontSize: 10,
+      valAxisHidden: true,
+      chartColorsOpacity: 50,
+    });
+
+    // Add note about scoring
+    serviceRadarSlide.addText(
+      "Service Scores (0-100): Plan size-adjusted weighting emphasizes essential services for small plans, standard for mid-market, and comprehensive coverage for large plans.\n\nFee Competitiveness (0-100): Higher score = lower fees relative to market. Does NOT consider services provided.",
+      {
+        x: 0.5,
+        y: 5.1,
+        w: 9,
+        h: 0.4,
+        fontSize: 9,
+        color: "666666",
+        italic: true,
+      }
+    );
+
+    // Slide: Service Coverage Summary
+    const serviceSummarySlide = pptx.addSlide();
+
+    serviceSummarySlide.addText("Service Coverage Summary", {
+      x: 0.5,
+      y: 0.3,
+      w: 9,
+      h: 0,
+      fontSize: 24,
+      bold: true,
+      color: "003B5C",
+    });
+
+    // Calculate service coverage
+    const advisorCoverage = calculateServiceCoverage(existingServices.advisor, advisorServiceBaseline);
+    const recordkeeperCoverage = calculateServiceCoverage(existingServices.recordKeeper, recordkeeperServiceBaseline);
+    const tpaCoverage = calculateServiceCoverage(existingServices.tpa, tpaServiceBaseline);
+    const auditCoverage = calculateServiceCoverage(existingServices.audit, auditServiceBaseline);
+
+    // Create table data
+    const tableRows: any[][] = [
+      [
+        { text: "Provider", options: { bold: true, color: "FFFFFF", fill: "003B5C" } },
+        { text: "Overall Score", options: { bold: true, color: "FFFFFF", fill: "003B5C" } },
+        { text: "Essential", options: { bold: true, color: "FFFFFF", fill: "003B5C" } },
+        { text: "Standard", options: { bold: true, color: "FFFFFF", fill: "003B5C" } },
+        { text: "Premium", options: { bold: true, color: "FFFFFF", fill: "003B5C" } },
+      ],
+      [
+        { text: "Advisor Services", options: {} },
+        { text: existingScore.breakdown.advisor.toString(), options: { bold: true } },
+        { text: `${advisorCoverage.essential.provided}/${advisorCoverage.essential.total} (${Math.round(advisorCoverage.essential.percentage)}%)`, options: {} },
+        { text: `${advisorCoverage.standard.provided}/${advisorCoverage.standard.total} (${Math.round(advisorCoverage.standard.percentage)}%)`, options: {} },
+        { text: `${advisorCoverage.premium.provided}/${advisorCoverage.premium.total} (${Math.round(advisorCoverage.premium.percentage)}%)`, options: {} },
+      ],
+      [
+        { text: "Recordkeeper Services", options: {} },
+        { text: existingScore.breakdown.recordKeeper.toString(), options: { bold: true } },
+        { text: `${recordkeeperCoverage.essential.provided}/${recordkeeperCoverage.essential.total} (${Math.round(recordkeeperCoverage.essential.percentage)}%)`, options: {} },
+        { text: `${recordkeeperCoverage.standard.provided}/${recordkeeperCoverage.standard.total} (${Math.round(recordkeeperCoverage.standard.percentage)}%)`, options: {} },
+        { text: `${recordkeeperCoverage.premium.provided}/${recordkeeperCoverage.premium.total} (${Math.round(recordkeeperCoverage.premium.percentage)}%)`, options: {} },
+      ],
+      [
+        { text: "TPA Services", options: {} },
+        { text: existingScore.breakdown.tpa.toString(), options: { bold: true } },
+        { text: `${tpaCoverage.essential.provided}/${tpaCoverage.essential.total} (${Math.round(tpaCoverage.essential.percentage)}%)`, options: {} },
+        { text: `${tpaCoverage.standard.provided}/${tpaCoverage.standard.total} (${Math.round(tpaCoverage.standard.percentage)}%)`, options: {} },
+        { text: `${tpaCoverage.premium.provided}/${tpaCoverage.premium.total} (${Math.round(tpaCoverage.premium.percentage)}%)`, options: {} },
+      ],
+      [
+        { text: "Audit Services", options: {} },
+        { text: existingScore.breakdown.audit.toString(), options: { bold: true } },
+        { text: `${auditCoverage.essential.provided}/${auditCoverage.essential.total} (${Math.round(auditCoverage.essential.percentage)}%)`, options: {} },
+        { text: `${auditCoverage.standard.provided}/${auditCoverage.standard.total} (${Math.round(auditCoverage.standard.percentage)}%)`, options: {} },
+        { text: `${auditCoverage.premium.provided}/${auditCoverage.premium.total} (${Math.round(auditCoverage.premium.percentage)}%)`, options: {} },
+      ],
+      [
+        { text: "Overall Service Score", options: { bold: true, fill: "E3F2FD" } },
+        { text: existingScore.score.toString(), options: { bold: true, color: "0078A2", fill: "E3F2FD" } },
+        { text: "", options: { fill: "E3F2FD" } },
+        { text: "", options: { fill: "E3F2FD" } },
+        { text: "", options: { fill: "E3F2FD" } },
+      ],
+    ];
+
+    serviceSummarySlide.addTable(tableRows, {
+      x: 0.5,
+      y: 1.0,
+      w: 9,
+      colW: [2.5, 1.3, 1.7, 1.7, 1.7],
+      fontSize: 11,
+      border: { pt: 1, color: "CCCCCC" },
+      align: "center",
+      valign: "middle",
+    });
+
+    // Add legend
+    serviceSummarySlide.addText(
+      "Service Tiers: Essential (E) = Core services for basic operation | Standard (S) = Expected by market | Premium (P) = Enhanced value services",
+      {
+        x: 0.5,
+        y: 4.8,
+        w: 9,
+        h: 0.4,
+        fontSize: 9,
+        color: "666666",
+        italic: true,
+      }
+    );
+
+    serviceSummarySlide.addText(disclaimer, {
+      x: 0.5,
+      y: 5.5,
+      w: 9,
+      fontSize: 10,
+      italic: true,
+      color: "666666",
+    });
+  }
 
   // Save the presentation
   const fileName = `Fee_Benchmark_Report_${new Date().toISOString().split('T')[0]}.pptx`;

@@ -139,21 +139,21 @@ export const planSizeExpectations: Record<string, PlanSizeServiceExpectations> =
     minRecordkeeperServices: 4,
     minTPAServices: 3,
     recommendedTiers: ['essential'],
-    notes: 'Small plans should prioritize essential services with focus on automation and cost efficiency'
+    notes: 'Small Plans (< $5M AUM) should prioritize essential services with focus on automation and cost efficiency'
   },
   '5M-50M': {
     minAdvisorServices: 5,
     minRecordkeeperServices: 6,
     minTPAServices: 5,
     recommendedTiers: ['essential', 'standard'],
-    notes: 'Mid-market plans should include all essential services plus most standard services'
+    notes: 'Mid-Market Plans ($5M-$50M AUM) should include all essential services plus most standard services'
   },
   'over50M': {
     minAdvisorServices: 6,
     minRecordkeeperServices: 8,
     minTPAServices: 6,
     recommendedTiers: ['essential', 'standard', 'premium'],
-    notes: 'Large plans should include comprehensive service packages with premium features'
+    notes: 'Large Plans (> $50M AUM) should include comprehensive service packages with premium features'
   }
 };
 
@@ -270,6 +270,7 @@ export function getPlanSizeCategory(aum: number): keyof typeof planSizeExpectati
 /**
  * Calculate a service value score (0-100)
  * Weights essential services more heavily than standard or premium
+ * Adjusts tier weights based on plan size to reflect different expectations
  */
 export function calculateServiceValueScore(
   serviceOptions: ServiceOptions | undefined,
@@ -306,17 +307,52 @@ export function calculateServiceValueScore(
     auditServiceBaseline
   );
 
-  // Weight essential services heavily (3x), standard (2x), premium (1x)
+  // Adjust tier weights based on plan size
+  // Smaller plans should heavily emphasize essential services
+  // Larger plans should value standard and premium services more
+  //
+  // SCORING PHILOSOPHY BY PLAN SIZE:
+  //
+  // Small Plans (< $5M):
+  //   - Should focus on cost-effective essential services
+  //   - Standard/premium services are nice but not critical
+  //   - A plan with only essential services scores ~71% (good)
+  //
+  // Mid-Market Plans ($5M-$50M):
+  //   - Expected to have comprehensive essential + standard coverage
+  //   - Premium services add value but aren't required
+  //   - A plan with only essential services scores ~50% (adequate but incomplete)
+  //
+  // Large Plans (> $50M):
+  //   - Should have comprehensive service packages across all tiers
+  //   - Premium services expected due to plan complexity and fiduciary expectations
+  //   - A plan with only essential services scores ~40% (concerning)
+  //
+  const tierWeights = {
+    'under5M': {
+      essential: 5,    // Heavily emphasize essential
+      standard: 1.5,   // Standard matters less
+      premium: 0.5     // Premium nearly irrelevant
+    },
+    '5M-50M': {
+      essential: 3,    // Essential still most important
+      standard: 2,     // Standard expected
+      premium: 1       // Premium nice to have
+    },
+    'over50M': {
+      essential: 3,    // Essential always important
+      standard: 2.5,   // Standard very important
+      premium: 2       // Premium expected for large plans
+    }
+  }[planSize];
+
+  // Weight essential services heavily, with plan size adjustments
   const calculateWeightedScore = (coverage: ReturnType<typeof calculateServiceCoverage>): number => {
-    const essentialWeight = 3;
-    const standardWeight = 2;
-    const premiumWeight = 1;
+    const essentialScore = coverage.essential.percentage * tierWeights.essential;
+    const standardScore = coverage.standard.percentage * tierWeights.standard;
+    const premiumScore = coverage.premium.percentage * tierWeights.premium;
 
-    const essentialScore = coverage.essential.percentage * essentialWeight;
-    const standardScore = coverage.standard.percentage * standardWeight;
-    const premiumScore = coverage.premium.percentage * premiumWeight;
-
-    const maxScore = (100 * essentialWeight) + (100 * standardWeight) + (100 * premiumWeight);
+    const maxScore = (100 * tierWeights.essential) + (100 * tierWeights.standard) + (100 * tierWeights.premium);
     return ((essentialScore + standardScore + premiumScore) / maxScore) * 100;
   };
 

@@ -146,7 +146,7 @@ export default function ServiceCoverageCard({
               Service Coverage - {planType === 'existing' ? 'Current Plan' : 'Proposed Plan'}
             </CardTitle>
             <CardDescription className="text-xs mt-1">
-              Analysis based on {planSize === 'under5M' ? 'small' : planSize === '5M-50M' ? 'mid-market' : 'large'} plan expectations
+              Analysis based on {planSize === 'under5M' ? 'Small Plan (< $5M AUM)' : planSize === '5M-50M' ? 'Mid-Market Plan ($5M-$50M AUM)' : 'Large Plan (> $50M AUM)'} expectations
             </CardDescription>
           </div>
           <div className={`border rounded-lg px-4 py-2 ${getScoreBgColor(valueScore.score)}`}>

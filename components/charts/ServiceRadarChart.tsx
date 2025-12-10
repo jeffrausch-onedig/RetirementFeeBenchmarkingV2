@@ -313,7 +313,7 @@ export default function ServiceRadarChart({
             </table>
           </div>
           <div className="text-[10px] text-muted-foreground bg-muted/20 px-3 py-1.5 rounded-md mt-2">
-            <strong>Service Scores (0-100):</strong> Measures coverage of essential, standard, and premium services. Overall score is weighted average emphasizing essential (3x), standard (2x), and premium (1x).
+            <strong>Service Scores (0-100):</strong> Measures coverage of essential, standard, and premium services with plan size-adjusted weighting. Small Plans (&lt; $5M AUM) emphasize essential services (5x weight), Mid-Market Plans ($5M-$50M AUM) balance essential (3x) and standard (2x), while Large Plans (&gt; $50M AUM) increasingly value standard (2.5x) and premium (2x) services.
           </div>
         </div>
 

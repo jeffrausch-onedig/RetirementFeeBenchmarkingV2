@@ -6,11 +6,20 @@ A comprehensive fee benchmarking tool designed for retirement plan consultants t
 
 - **Multi-Fee Structure Support**: Handles basis points, flat fees, flat + per participant, and per participant fee structures
 - **Comprehensive Comparisons**: Compare existing vs proposed plans side-by-side
+- **Plan Size-Adjusted Service Scoring**: Evaluates service coverage with plan size-appropriate expectations
+  - Small Plans (< $5M AUM): Emphasizes essential services
+  - Mid-Market Plans ($5M-$50M AUM): Expects essential + standard services
+  - Large Plans (> $50M AUM): Requires comprehensive service packages
+- **Service Tier System**: Categorizes services as Essential, Standard, or Premium based on industry standards
+- **AI-Powered Executive Summary**: Generates professional analysis using Azure OpenAI
 - **Interactive Visualizations**:
   - Horizontal stacked bar charts showing total fee breakdowns
+  - Service radar charts showing coverage across all providers
   - Detailed fee summary tables with dollar and percentage amounts
   - Vertical bar charts comparing fees to 25th, 50th, and 75th percentile benchmarks
+  - Service-by-service comparison tables with tier badges
 - **Benchmark Categories**: Support for AUM buckets and optional average account balance filtering
+- **PowerPoint Export**: One-click export of complete analysis to presentation format
 - **Custom Themed UI**: Built with shadcn/ui components using your brand colors
 
 ## Tech Stack
@@ -78,6 +87,8 @@ npm start
 
 ### Understanding Results
 
+#### Fee Analysis
+
 **Horizontal Stacked Bar Chart**: Shows breakdown of all fee types for existing, proposed, and benchmark percentiles
 
 **Fee Summary Table**: Detailed breakdown showing:
@@ -89,6 +100,54 @@ npm start
 - 25th, 50th, and 75th percentile benchmarks
 - Your existing plan fees
 - Your proposed plan fees (if applicable)
+
+#### Service Analysis
+
+**Service Radar Chart**: 5-axis visualization showing:
+- Service coverage scores for Advisor, Recordkeeper, TPA, and Audit
+- Total fee competitiveness score (lower fees = higher score)
+- Visual comparison between existing and proposed plans
+- Market median reference line (50th percentile)
+
+**Service Value Score (0-100)**: Plan size-adjusted scoring that evaluates service coverage:
+- **Score Interpretation**:
+  - 80-100: Comprehensive service coverage
+  - 60-79: Adequate service coverage
+  - 40-59: Limited service coverage
+  - 0-39: Concerning service gaps
+
+- **Plan Size Adjustments**:
+  - **Small Plans (< $5M AUM)**: Heavily weighted toward essential services (5x)
+    - A plan with only essential services scores ~71% (excellent)
+  - **Mid-Market Plans ($5M-$50M AUM)**: Balanced weighting (essential 3x, standard 2x)
+    - A plan with only essential services scores ~50% (adequate but incomplete)
+  - **Large Plans (> $50M AUM)**: Higher expectations for comprehensive coverage
+    - A plan with only essential services scores ~40% (concerning)
+
+**Service Tiers**:
+- **Essential (E - Red badge)**: Core services required for basic plan operation and fiduciary compliance
+- **Standard (S - Blue badge)**: Services expected by most plans in the market segment
+- **Premium (P - Purple badge)**: Enhanced services that provide additional value
+
+**Service Coverage Cards**: Breakdown by provider showing:
+- Essential, Standard, and Premium service coverage percentages
+- Service count comparisons
+- Missing essential services warnings
+- Plan size-specific guidance
+
+**Detailed Service Comparison**: Service-by-service comparison organized by tier with:
+- Visual tier badges for easy identification
+- Side-by-side comparison of existing vs proposed
+- Coverage percentage by tier for each provider
+
+#### AI Executive Summary
+
+AI-generated professional analysis that:
+- Evaluates overall fee positioning vs. market benchmarks
+- Analyzes each fee component with service coverage context
+- Identifies optimization opportunities or justifications for fee levels
+- Provides specific, actionable recommendations prioritized by impact
+- Considers both fee competitiveness AND service adequacy
 
 ## Integrating with Domo API
 

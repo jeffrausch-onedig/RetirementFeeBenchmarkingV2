@@ -260,6 +260,7 @@ export default function ServiceCoverageCardCombined({
             )}
           </div>
         </div>
+      </div>
 
       {/* Insights/Warnings */}
       {allInsights.length > 0 && (
@@ -327,7 +328,7 @@ export default function ServiceCoverageCardCombined({
       <div className="space-y-1">
         {/* Service Score Explanation */}
         <div className="text-[10px] text-muted-foreground bg-muted/20 px-3 py-1.5 rounded-md">
-          <strong>Service Scores (0-100):</strong> Measures coverage of essential, standard, and premium services. Overall score is weighted average emphasizing essential (3x), standard (2x), and premium (1x).
+          <strong>Service Scores (0-100):</strong> Measures coverage of essential, standard, and premium services with plan size-adjusted weighting. Scoring reflects {planSize === 'under5M' ? 'Small Plan (< $5M AUM) priorities (essential 5x, standard 1.5x, premium 0.5x)' : planSize === '5M-50M' ? 'Mid-Market Plan ($5M-$50M AUM) expectations (essential 3x, standard 2x, premium 1x)' : 'Large Plan (> $50M AUM) requirements (essential 3x, standard 2.5x, premium 2x)'}.
         </div>
 
         {/* Plan size expectations note */}

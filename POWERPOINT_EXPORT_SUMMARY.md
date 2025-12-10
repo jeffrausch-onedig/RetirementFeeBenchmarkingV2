@@ -295,11 +295,167 @@ npm run dev
 7. **Version History**: Track and export multiple summary versions
 8. **PDF Export**: Generate PDF reports with summary included
 
+## Service Analysis Slides
+
+### Overview
+
+In addition to fee analysis, the PowerPoint export now includes comprehensive service analysis slides when service data is available.
+
+### Service Slides Included
+
+**1. Service & Fee Competitiveness Analysis (Radar Chart)**
+- 5-axis radar chart showing:
+  - Advisor Services score (0-100)
+  - Recordkeeper Services score (0-100)
+  - TPA Services score (0-100)
+  - Audit Services score (0-100)
+  - Total Fee Competitiveness score (0-100)
+- Compares Current Plan vs Proposed Plan (if applicable)
+- Filled radar visualization with color coding
+
+**2. Service Coverage Summary (Table)**
+- Provider-by-provider breakdown showing:
+  - Overall service score for each provider
+  - Essential service coverage (count/total and percentage)
+  - Standard service coverage (count/total and percentage)
+  - Premium service coverage (count/total and percentage)
+- Includes Overall Service Score summary row
+- Color-coded header (dark blue) and summary row (light blue)
+
+### Service Scoring System
+
+**Plan Size-Adjusted Weighting:**
+- **Small Plans (< $5M AUM)**: Emphasize essential services (5x weight)
+- **Mid-Market Plans ($5M-$50M AUM)**: Balance essential (3x) and standard (2x)
+- **Large Plans (> $50M AUM)**: Value comprehensive coverage including premium (2x)
+
+**Fee Competitiveness Scoring:**
+- Inverted scale: Lower fees = higher score
+- Based on percentile positioning against market benchmarks
+- Purely cost-based (does not consider services)
+- Calculated using linear interpolation between benchmark quartiles
+
+### Slide Layout Example
+
+**Service & Fee Competitiveness Analysis:**
+```
+┌─────────────────────────────────────────┐
+│ Service & Fee Competitiveness Analysis │  ← 24pt bold
+│ Comprehensive view of service coverage  │  ← 12pt subtitle
+│ and fee positioning                     │
+│                                         │
+│      [5-AXIS RADAR CHART]              │
+│        - Advisor Services               │
+│        - Recordkeeper Services          │
+│        - TPA Services                   │
+│        - Audit Services                 │
+│        - Total Fee Competitiveness      │
+│                                         │
+│ Current Plan (blue) vs Proposed (green)│  ← Legend
+│                                         │
+│ Service Scores (0-100): Plan size-     │  ← Explanatory notes
+│ adjusted weighting...                   │
+│ Fee Competitiveness (0-100): Higher     │
+│ score = lower fees...                   │
+└─────────────────────────────────────────┘
+```
+
+**Service Coverage Summary:**
+```
+┌─────────────────────────────────────────┐
+│ Service Coverage Summary                │  ← 24pt bold
+│                                         │
+│ ┌─────────────────────────────────────┐│
+│ │Provider│Score│Essential│Std│Premium││  ← Table header
+│ ├────────┼─────┼─────────┼───┼───────┤│
+│ │Advisor │ 85  │ 8/8(100%)│...│...   ││
+│ │Recordk.│ 75  │ 5/5(100%)│...│...   ││
+│ │TPA     │ 90  │ 3/3(100%)│...│...   ││
+│ │Audit   │ 50  │ 0/0  (0%)│...│...   ││
+│ │Overall │ 82  │          │   │      ││  ← Summary row
+│ └────────┴─────┴─────────┴───┴───────┘│
+│                                         │
+│ Service Tiers: Essential (E) = Core... │  ← Legend
+│ Data Source: NEPC DC Plan & Fee Survey │
+└─────────────────────────────────────────┘
+```
+
+### Technical Implementation
+
+**ExportOptions Interface Updated:**
+```typescript
+interface ExportOptions {
+  // ... existing properties
+  existingServices?: ServiceOptions;
+  proposedServices?: ServiceOptions;
+}
+```
+
+**Service Score Calculations:**
+```typescript
+// Calculate service value scores
+const existingScore = calculateServiceValueScore(existingServices, aum);
+const proposedScore = proposedServices
+  ? calculateServiceValueScore(proposedServices, aum)
+  : null;
+
+// Calculate fee competitiveness scores
+const existingFeeScore = calculateFeePercentileScore(
+  existingFees.total.percentage,
+  benchmarks.total
+);
+```
+
+**Data Flow:**
+```
+BenchmarkResults component
+    ↓
+Pass services to exportToPowerPoint()
+    ↓
+Check if existingServices exists
+    ↓
+Calculate service scores and coverage
+    ↓
+Generate radar chart slide
+    ↓
+Generate coverage summary table slide
+    ↓
+Continue with fee analysis slides
+```
+
+### Slide Order
+
+When all features are enabled:
+
+1. **Executive Summary** (if AI summary generated)
+2. **Fee Benchmark Comparison** (stacked bar chart)
+3. **Advisor Fee** (itemized comparison)
+4. **Record Keeper Fee** (itemized comparison)
+5. **Investment Menu Fee** (itemized comparison)
+6. **TPA Fee** (itemized comparison)
+7. **Total Plan Fee** (itemized comparison)
+8. **Service & Fee Competitiveness Analysis** (radar chart) - NEW
+9. **Service Coverage Summary** (table) - NEW
+
+### Benefits
+
+**For Advisors:**
+- Comprehensive service documentation in client reports
+- Visual comparison of service levels vs fees
+- Evidence of service adequacy for fiduciary documentation
+- Plan size-appropriate service expectations built-in
+
+**For Clients:**
+- Clear understanding of what services they're receiving
+- Context for whether fees are justified by service levels
+- Identification of service gaps or over-servicing
+- Tier-based categorization (Essential/Standard/Premium)
+
 ## Files Modified
 
-- `lib/exportToPowerPoint.ts` - Added executive summary slide generation
+- `lib/exportToPowerPoint.ts` - Added executive summary slide generation + service analysis slides
 - `components/ExecutiveSummary.tsx` - Added onSummaryGenerated callback
-- `components/BenchmarkResults.tsx` - State management for AI summary
+- `components/BenchmarkResults.tsx` - State management for AI summary + pass service data to export
 - `CLAUDE.md` - Updated documentation
 - `AI_SUMMARY_IMPLEMENTATION.md` - Added PowerPoint export section
-- `POWERPOINT_EXPORT_SUMMARY.md` - This file (new)
+- `POWERPOINT_EXPORT_SUMMARY.md` - This file (updated)

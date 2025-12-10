@@ -117,6 +117,8 @@ export function BenchmarkResults({ data }: BenchmarkResultsProps) {
         viewMode: feeViewMode,
         feeType: data.existing?.feeType || 'unbundled',
         aiSummary: aiSummary,
+        existingServices: data.existing?.services,
+        proposedServices: data.proposed?.services,
       });
     } catch (error) {
       console.error("Error exporting to PowerPoint:", error);
@@ -338,36 +340,6 @@ export function BenchmarkResults({ data }: BenchmarkResultsProps) {
       </Card>
         </>
       )}
-
-      {/* Debug data (can be removed later) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Debug Data</CardTitle>
-          <CardDescription>
-            Raw data for verification
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-semibold mb-2">Calculated Fees:</h3>
-              <pre className="bg-muted p-4 rounded text-sm overflow-auto">
-                {JSON.stringify({
-                  existingFees,
-                  proposedFees: proposedFees ? 'Present' : 'None',
-                  aum,
-                }, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Benchmark Data:</h3>
-              <pre className="bg-muted p-4 rounded text-sm overflow-auto">
-                {JSON.stringify(benchmarks, null, 2)}
-              </pre>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
