@@ -102,26 +102,34 @@ export function FormWizard() {
       <div className="space-y-6">
         <BenchmarkResults
           data={comparisonData}
-          showSummaryButton={true}
-          showExportButton={true}
+          showSummaryButton={false}
+          showExportButton={false}
+          renderTopButtons={(summaryButton, exportButton) => (
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex gap-3">
+                {summaryButton}
+                {exportButton}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setIsSavedView(false);
+                    setCurrentStep(1);
+                  }}
+                  className="px-6 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md"
+                >
+                  Edit Report
+                </button>
+                <button
+                  onClick={handleStartOver}
+                  className="px-6 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md"
+                >
+                  Create New Report
+                </button>
+              </div>
+            </div>
+          )}
         />
-        <div className="flex justify-center gap-4">
-          <button
-            onClick={() => {
-              setIsSavedView(false);
-              setCurrentStep(1);
-            }}
-            className="px-6 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md"
-          >
-            Edit Report
-          </button>
-          <button
-            onClick={handleStartOver}
-            className="px-6 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
-          >
-            Create New Report
-          </button>
-        </div>
       </div>
     );
   }

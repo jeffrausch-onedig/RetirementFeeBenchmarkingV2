@@ -20,9 +20,10 @@ interface BenchmarkResultsProps {
   data: ComparisonData;
   showSummaryButton?: boolean;
   showExportButton?: boolean;
+  renderTopButtons?: (summaryButton: React.ReactNode, exportButton: React.ReactNode) => React.ReactNode;
 }
 
-export function BenchmarkResults({ data, showSummaryButton = true, showExportButton = true }: BenchmarkResultsProps) {
+export function BenchmarkResults({ data, showSummaryButton = true, showExportButton = true, renderTopButtons }: BenchmarkResultsProps) {
   const [benchmarks, setBenchmarks] = useState<BenchmarkComparison | null>(null);
   const [existingFees, setExistingFees] = useState<CalculatedFees | null>(null);
   const [proposedFees, setProposedFees] = useState<CalculatedFees | null>(null);
@@ -170,30 +171,52 @@ export function BenchmarkResults({ data, showSummaryButton = true, showExportBut
       )}
 
       {/* Export Button and Generate Summary Button */}
-      {(showSummaryButton || showExportButton) && (
-        <div className="flex justify-between items-center">
-          {showSummaryButton && (
-            <>
-              {!showSummary && (
-                <Button onClick={() => setShowSummary(true)} variant="outline">
-                  Generate AI Summary
-                </Button>
-              )}
-              {showSummary && aiSummary && (
-                <Button onClick={handleRegenerateSummary} variant="outline">
-                  Regenerate AI Summary
-                </Button>
-              )}
-              {showSummary && !aiSummary && <div></div>}
-            </>
-          )}
-          {!showSummaryButton && <div></div>}
-          {showExportButton && (
-            <Button onClick={handleExport} variant="default">
-              Export to PowerPoint
-            </Button>
-          )}
-        </div>
+      {renderTopButtons ? (
+        renderTopButtons(
+          // Summary Button
+          <>
+            {!showSummary && (
+              <Button onClick={() => setShowSummary(true)} variant="outline">
+                Generate AI Summary
+              </Button>
+            )}
+            {showSummary && aiSummary && (
+              <Button onClick={handleRegenerateSummary} variant="outline">
+                Regenerate AI Summary
+              </Button>
+            )}
+          </>,
+          // Export Button
+          <Button onClick={handleExport} variant="default">
+            Export to PowerPoint
+          </Button>
+        )
+      ) : (
+        (showSummaryButton || showExportButton) && (
+          <div className="flex justify-between items-center">
+            {showSummaryButton && (
+              <>
+                {!showSummary && (
+                  <Button onClick={() => setShowSummary(true)} variant="outline">
+                    Generate AI Summary
+                  </Button>
+                )}
+                {showSummary && aiSummary && (
+                  <Button onClick={handleRegenerateSummary} variant="outline">
+                    Regenerate AI Summary
+                  </Button>
+                )}
+                {showSummary && !aiSummary && <div></div>}
+              </>
+            )}
+            {!showSummaryButton && <div></div>}
+            {showExportButton && (
+              <Button onClick={handleExport} variant="default">
+                Export to PowerPoint
+              </Button>
+            )}
+          </div>
+        )
       )}
 
       {/* AI Executive Summary - Only show after user clicks generate */}
