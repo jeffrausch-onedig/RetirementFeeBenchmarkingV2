@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ComparisonData, PlanData } from "@/lib/types";
 import { BenchmarkSelection } from "./wizard/BenchmarkSelection";
 import { PlanAndFeeDetails } from "./wizard/PlanAndFeeDetails";
@@ -47,6 +47,11 @@ export function FormWizard() {
   const [proposedPlan, setProposedPlan] = useState<PlanData>({ ...emptyPlanData });
   const [includeProposed, setIncludeProposed] = useState(false);
   const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentStep]);
 
   const handleNext = () => {
     if (currentStep < WIZARD_STEPS.length) {
