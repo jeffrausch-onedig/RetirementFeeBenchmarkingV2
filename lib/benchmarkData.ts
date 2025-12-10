@@ -1,14 +1,78 @@
 import { BenchmarkData, BenchmarkComparison, BenchmarkPercentiles } from './types';
+import Papa from 'papaparse';
 
 // Cache for benchmark data
 let benchmarkCache: BenchmarkData[] | null = null;
+
+/**
+ * Load benchmark data from local CSV file (fallback)
+ */
+async function loadFromCSV(): Promise<BenchmarkData[]> {
+  try {
+    console.log('Loading benchmark data from local CSV file...');
+    const response = await fetch('/RetirementFeeDataset (1).csv');
+    const csvText = await response.text();
+
+    return new Promise((resolve, reject) => {
+      Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: false,
+        complete: (results) => {
+          const data = results.data.map((row: any) => ({
+            clientID: row.ClientID || '',
+            salesforceAccountID: row.SalesforceAccountID || '',
+            d365AccountID: row.D365AccountID || '',
+            reportID: row.ReportID || '',
+            creationDate: row.CreationDate || '',
+            clientName: row.ClientName || '',
+            sic: row.SIC || '',
+            benchmarkSource: row.BenchmarkSource || '',
+            type: row.Type || '',
+            bmAssets: row.BMAssets || '',
+            bmAvgBalance: row.BMAvgBalance || 'All',
+            retirementFee25th: parseFloat(row.RetirementFee25th || 0),
+            retirementFee50th: parseFloat(row.RetirementFee50th || 0),
+            retirementFee75th: parseFloat(row.RetirementFee75th || 0),
+            assets: parseFloat(row.Assets || 0),
+            avgBalance: parseFloat(row.AvgBalance || 0),
+            recordKeeperFeePrcnt: parseFloat(row.RecordKeeperFeePrcnt || 0),
+            advisorFeePrcnt: parseFloat(row.AdvisorFeePrcnt || 0),
+            investmentManagerFeePrcnt: parseFloat(row.InvestmentManagerFeePrcnt || 0),
+            tpaFeePrcnt: parseFloat(row.TPAFeePrcnt || 0),
+            totalPlanFeePrcnt: parseFloat(row.TotalPlanFeePrcnt || 0),
+            recordKeeperFeeDollars: parseFloat(row.RecordKeeperFeeDollars || 0),
+            advisorFeeDollars: parseFloat(row.AdvisorFeeDollars || 0),
+            investmentManagerFeeDollars: parseFloat(row.InvestmentManagerFeeDollars || 0),
+            tpaFeeDollars: parseFloat(row.TPAFeeDollars || 0),
+            totalPlanFeeDollars: parseFloat(row.TotalPlanFeeDollars || 0),
+          }));
+          console.log(`Loaded ${data.length} rows from CSV file`);
+          resolve(data);
+        },
+        error: (error: any) => {
+          console.error('Error parsing CSV:', error);
+          reject(error);
+        },
+      });
+    });
+  } catch (error) {
+    console.error('Error loading from CSV:', error);
+    throw error;
+  }
+}
 
 /**
  * Load benchmark data from Domo API
  */
 async function loadFromDomoAPI(): Promise<BenchmarkData[]> {
   try {
-    const response = await fetch('/api/benchmark');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    const response = await fetch('/api/benchmark', { signal: controller.signal });
+    clearTimeout(timeoutId);
+
     const result = await response.json();
 
     if (!result.success) {
@@ -18,7 +82,7 @@ async function loadFromDomoAPI(): Promise<BenchmarkData[]> {
 
     // Transform Domo data to BenchmarkData format
     // Domo returns data with column names: Type, BMAssets, BMAvgBalance, RetirementFee25th, etc.
-    return result.data.map((row: any) => ({
+    const data = result.data.map((row: any) => ({
       clientID: row.ClientID || '',
       salesforceAccountID: row.SalesforceAccountID || '',
       d365AccountID: row.D365AccountID || '',
@@ -46,6 +110,8 @@ async function loadFromDomoAPI(): Promise<BenchmarkData[]> {
       tpaFeeDollars: parseFloat(row.TPAFeeDollars || 0),
       totalPlanFeeDollars: parseFloat(row.TotalPlanFeeDollars || 0),
     }));
+    console.log(`Loaded ${data.length} rows from Domo API`);
+    return data;
   } catch (error) {
     console.error('Error loading from Domo API:', error);
     throw error;
@@ -54,20 +120,27 @@ async function loadFromDomoAPI(): Promise<BenchmarkData[]> {
 
 
 /**
- * Load benchmark data from Domo API
+ * Load benchmark data from Domo API with CSV fallback
  */
 export async function loadBenchmarkData(): Promise<BenchmarkData[]> {
   if (benchmarkCache) {
     return benchmarkCache;
   }
 
+  // Try Domo API first, fall back to CSV if it fails
   try {
-    console.log('Loading benchmark data from Domo API...');
+    console.log('Attempting to load benchmark data from Domo API...');
     benchmarkCache = await loadFromDomoAPI();
     return benchmarkCache;
-  } catch (error) {
-    console.error('Error loading benchmark data from Domo API:', error);
-    throw error; // Don't return empty array, let the error propagate
+  } catch (domoError) {
+    console.warn('Domo API failed, falling back to local CSV file:', domoError);
+    try {
+      benchmarkCache = await loadFromCSV();
+      return benchmarkCache;
+    } catch (csvError) {
+      console.error('Both Domo API and CSV fallback failed:', csvError);
+      throw new Error('Unable to load benchmark data from either Domo API or local CSV file');
+    }
   }
 }
 
